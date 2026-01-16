@@ -86,11 +86,17 @@ jobs:
         if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
         id: version
         run: |
+          # Fetch tags from distribution repository (where releases are published)
+          echo "📥 Fetching tags from distribution repository..."
+          DIST_TAGS=$(git ls-remote --tags "https://x-access-token:${{ secrets.DISTRIBUTION_REPO_TOKEN }}@github.com/${{ secrets.DISTRIBUTION_REPO }}.git" 2>/dev/null | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+(-uat)?' | sort -V || echo "")
+
+          echo "Available tags in distribution repo:"
+          echo "$DIST_TAGS" | tail -10
+
           # Get the last production tag (without -uat suffix)
-          LAST_PROD_TAG=$(git tag -l 'v[0-9]*.[0-9]*.[0-9]' --sort=-v:refname | grep -v '\-uat' | head -1)
+          LAST_PROD_TAG=$(echo "$DIST_TAGS" | grep -v '\-uat' | sort -V | tail -1)
 
           if [ -z "$LAST_PROD_TAG" ]; then
-            # No previous tags, start from v1.0.0
             LAST_PROD_TAG="v1.0.0"
             echo "⚠️  No previous production tags found, starting from v1.0.0"
           fi
@@ -114,9 +120,8 @@ jobs:
             TAG="v${NEW_VERSION}"
             echo "📦 Production release: minor++ → $NEW_VERSION"
           else
-            # UAT release: increment patch from last UAT or production
-            # Find the last UAT tag for current minor version
-            LAST_UAT_TAG=$(git tag -l "v${MAJOR}.${MINOR}.*-uat" --sort=-v:refname | head -1)
+            # UAT release: increment patch from last UAT for current minor version
+            LAST_UAT_TAG=$(echo "$DIST_TAGS" | grep "v${MAJOR}\.${MINOR}\.[0-9]*-uat" | sort -V | tail -1)
 
             if [ -z "$LAST_UAT_TAG" ]; then
               # First UAT after production release, start with patch=1
