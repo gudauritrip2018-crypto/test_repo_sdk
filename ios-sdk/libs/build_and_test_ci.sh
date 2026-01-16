@@ -49,8 +49,9 @@ PROJECT_PATH="${PROJECT_ROOT}/src/${PROJECT_NAME}.xcodeproj"
 OUTPUT_DIR="${SCRIPT_DIR}"
 BUILD_DIR="${OUTPUT_DIR}/Build"
 
-# Allow overriding DerivedData path for local testing
-DERIVED_DATA="${DERIVED_DATA_OVERRIDE:-$PROJECT_ROOT/DerivedData-Tests}"
+# DerivedData paths - reuse simulator build data for tests to speed up compilation
+BUILD_DERIVED_DATA_SIMULATOR="${OUTPUT_DIR}/Build/DerivedData-Simulator"
+DERIVED_DATA="${DERIVED_DATA_OVERRIDE:-$BUILD_DERIVED_DATA_SIMULATOR}"
 
 # Shared SourcePackages directory for all builds (speeds up dependency resolution)
 SHARED_SOURCE_PACKAGES="${PROJECT_ROOT}/SourcePackages"
@@ -445,46 +446,17 @@ EOF
 run_tests() {
     print_status "🧪 Running tests in CI environment..."
     echo ""
-    
-    # Clean derived data (but keep cached dependencies if available)
-    echo "🧹 Preparing test environment..."
-    
-    # Check if precompiled SourcePackages exist in repository
-    REPO_SOURCE_PACKAGES="$PROJECT_ROOT/libs/SourcePackages"
-    if [ -d "$REPO_SOURCE_PACKAGES" ]; then
-        echo "📦 Found precompiled SourcePackages in repository, using them..."
-        # Copy precompiled SourcePackages to DerivedData
-        mkdir -p "$DERIVED_DATA"
-        if [ ! -d "$DERIVED_DATA/SourcePackages" ] || [ "$REPO_SOURCE_PACKAGES" -nt "$DERIVED_DATA/SourcePackages" ]; then
-            echo "📦 Copying precompiled SourcePackages to DerivedData..."
-            rm -rf "$DERIVED_DATA/SourcePackages"
-            cp -R "$REPO_SOURCE_PACKAGES" "$DERIVED_DATA/SourcePackages"
-        fi
-    fi
-    
-    if [ -d "$DERIVED_DATA" ]; then
-        echo "📦 Found existing DerivedData, keeping cached dependencies..."
-        # Only clean test-specific artifacts, keep SourcePackages and compiled modules
-        rm -rf "$DERIVED_DATA/Build/Products/Debug-iphonesimulator/AriseMobileSdkTests.xctest" 2>/dev/null || true
-        rm -rf "$DERIVED_DATA/Build/Intermediates.noindex/AriseMobileSdk.build" 2>/dev/null || true
-        # Keep SourcePackages for faster dependency resolution
-        # Keep ModuleCache if it exists (can speed up compilation)
-        # Only clean module cache if it's causing issues
-        if [ -d "$DERIVED_DATA/ModuleCache.noindex" ] && [ "$(find "$DERIVED_DATA/ModuleCache.noindex" -type f | wc -l)" -gt 10000 ]; then
-            echo "🧹 Cleaning large module cache to prevent compilation hangs..."
-            rm -rf "$DERIVED_DATA/ModuleCache.noindex" 2>/dev/null || true
-        fi
-        # Keep SwiftExplicitPrecompiledModules if they exist (can speed up compilation)
+
+    # Reuse DerivedData from simulator build if available (speeds up significantly)
+    if [ -d "$DERIVED_DATA/Build/Products" ]; then
+        echo "📦 Reusing DerivedData from simulator build - dependencies already compiled!"
     else
+        echo "📦 No existing DerivedData found, will compile dependencies during test"
         mkdir -p "$DERIVED_DATA"
     fi
-    
-    # Clean old test results bundle
-    # Note: xcresult is a directory, not a file
-    if [ -d "$PROJECT_ROOT/test-results.xcresult" ] || [ -f "$PROJECT_ROOT/test-results.xcresult" ]; then
-        echo "🧹 Cleaning old test results bundle..."
-        rm -rf "$PROJECT_ROOT/test-results.xcresult"
-    fi
+
+    # Clean old test results
+    rm -rf "$PROJECT_ROOT/test-results.xcresult" 2>/dev/null || true
     
     # Find available simulator using xcodebuild to get compatible destinations
     echo "📱 Finding compatible simulator..."

@@ -55,7 +55,8 @@ jobs:
         id: version
         run: |
           echo "📥 Fetching tags from distribution repository..."
-          DIST_TAGS=$(git ls-remote --tags "https://x-access-token:${{ secrets.DISTRIBUTION_REPO_TOKEN }}@github.com/${{ secrets.DISTRIBUTION_REPO }}.git" 2>/dev/null | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+(-uat)?' | sort -V || echo "")
+          # Fetch tags and deduplicate (annotated tags show twice: tag and tag^{})
+          DIST_TAGS=$(git ls-remote --tags "https://x-access-token:${{ secrets.DISTRIBUTION_REPO_TOKEN }}@github.com/${{ secrets.DISTRIBUTION_REPO }}.git" 2>/dev/null | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+(-uat)?' | sort -Vu || echo "")
 
           echo "Available tags:"
           echo "$DIST_TAGS" | tail -10
@@ -79,7 +80,11 @@ jobs:
             TAG="v${NEW_VERSION}"
             echo "📦 Production: $NEW_VERSION"
           else
-            LAST_UAT_TAG=$(echo "$DIST_TAGS" | grep "v${MAJOR}\.${MINOR}\.[0-9]*-uat" | sort -V | tail -1)
+            # Use extended regex and match at least one digit for patch version
+            LAST_UAT_TAG=$(echo "$DIST_TAGS" | grep -E "^v${MAJOR}\.${MINOR}\.[0-9]+-uat$" | sort -V | tail -1)
+            echo "🔍 Looking for UAT tags matching: v${MAJOR}.${MINOR}.*-uat"
+            echo "🔍 Found: ${LAST_UAT_TAG:-none}"
+
             if [ -z "$LAST_UAT_TAG" ]; then
               NEW_PATCH=1
             else
@@ -88,7 +93,7 @@ jobs:
             fi
             NEW_VERSION="${MAJOR}.${MINOR}.${NEW_PATCH}"
             TAG="v${NEW_VERSION}-uat"
-            echo "🧪 UAT: $NEW_VERSION-uat"
+            echo "🧪 UAT: $NEW_VERSION-uat (patch: $NEW_PATCH)"
           fi
 
           echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
@@ -100,15 +105,18 @@ jobs:
           TAG="${{ steps.version.outputs.tag }}"
           FORCE="${{ inputs.force_release }}"
 
-          # Check in distribution repo
-          EXISTS=$(git ls-remote --tags "https://x-access-token:${{ secrets.DISTRIBUTION_REPO_TOKEN }}@github.com/${{ secrets.DISTRIBUTION_REPO }}.git" "$TAG" 2>/dev/null | wc -l)
+          # Check in distribution repo - look for exact tag match
+          echo "🔍 Checking if tag $TAG exists..."
+          REPO_URL="https://x-access-token:${{ secrets.DISTRIBUTION_REPO_TOKEN }}@github.com/${{ secrets.DISTRIBUTION_REPO }}.git"
+          TAG_CHECK=$(git ls-remote --tags "$REPO_URL" "refs/tags/${TAG}" 2>/dev/null || echo "")
 
-          if [ "$EXISTS" -gt 0 ] && [ "$FORCE" != "true" ]; then
+          if [ -n "$TAG_CHECK" ] && [ "$FORCE" != "true" ]; then
             echo "should_release=false" >> $GITHUB_OUTPUT
-            echo "⚠️ Tag $TAG exists, skipping"
+            echo "⚠️ Tag $TAG already exists in distribution repo, skipping release"
+            echo "   (use force_release=true to override)"
           else
             echo "should_release=true" >> $GITHUB_OUTPUT
-            echo "✅ Will release $TAG"
+            echo "✅ Tag $TAG does not exist, will create release"
           fi
 
 # ===========================================
@@ -323,14 +331,25 @@ jobs:
           TAG="${{ needs.setup.outputs.tag }}"
           TYPE="${{ needs.setup.outputs.release_type }}"
 
-          if [[ "$TYPE" == "uat" ]]; then
-            git tag -a "$TAG" -m "UAT Release $TAG"
-          else
-            git tag -a "$TAG" -m "Production Release $TAG"
+          # Safety check - verify tag doesn't exist locally or remotely
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            echo "⚠️ Tag $TAG already exists locally, deleting..."
+            git tag -d "$TAG"
           fi
 
-          git push origin "$TAG"
-          echo "✅ Tag $TAG created"
+          if git ls-remote --tags origin "refs/tags/${TAG}" | grep -q .; then
+            echo "⚠️ Tag $TAG already exists remotely, skipping tag creation"
+            echo "   Release will use existing tag"
+          else
+            if [[ "$TYPE" == "uat" ]]; then
+              git tag -a "$TAG" -m "UAT Release $TAG"
+            else
+              git tag -a "$TAG" -m "Production Release $TAG"
+            fi
+
+            git push origin "$TAG"
+            echo "✅ Tag $TAG created and pushed"
+          fi
 
       - name: Find Archive
         id: archive
