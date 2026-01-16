@@ -53,21 +53,37 @@ jobs:
 
       - name: Calculate next version
         id: version
+        env:
+          DIST_REPO_TOKEN: ${{ secrets.DISTRIBUTION_REPO_TOKEN }}
+          DIST_REPO: ${{ secrets.DISTRIBUTION_REPO }}
         run: |
           echo "📥 Fetching tags from distribution repository..."
 
-          # Debug: show repo URL (without token)
-          REPO_NAME="${{ secrets.DISTRIBUTION_REPO }}"
+          # Debug: show repo info
           echo "═══════════════════════════════════════"
-          echo "🔗 Distribution repo: $REPO_NAME"
-          echo "🔗 Full URL: https://github.com/${REPO_NAME}.git"
+          echo "🔗 Distribution repo: ${DIST_REPO}"
+          echo "🔗 Token length: ${#DIST_REPO_TOKEN} chars"
           echo "═══════════════════════════════════════"
           echo ""
 
-          # Debug: show raw git ls-remote output
-          echo "Raw git ls-remote output:"
+          # Clone the distribution repo to get tags
+          echo "📦 Cloning distribution repo..."
+          REPO_URL="https://x-access-token:${DIST_REPO_TOKEN}@github.com/${DIST_REPO}.git"
+
+          if git clone --bare --filter=blob:none "$REPO_URL" dist-repo-tags 2>&1; then
+            echo "✅ Clone successful"
+            cd dist-repo-tags
+            RAW_OUTPUT=$(git tag -l 'v*' 2>&1) || true
+            cd ..
+            rm -rf dist-repo-tags
+          else
+            echo "❌ Clone failed, trying ls-remote..."
+            RAW_OUTPUT=$(git ls-remote --tags "$REPO_URL" 2>&1) || true
+          fi
+
+          echo ""
+          echo "Raw tags output:"
           echo "═══════════════════════════════════════"
-          RAW_OUTPUT=$(git ls-remote --tags "https://x-access-token:${{ secrets.DISTRIBUTION_REPO_TOKEN }}@github.com/${{ secrets.DISTRIBUTION_REPO }}.git" 2>&1) || true
           echo "$RAW_OUTPUT" | head -30
           echo ""
 
@@ -161,12 +177,15 @@ jobs:
 
       - name: Check if tag exists
         id: check_tag
+        env:
+          DIST_REPO_TOKEN: ${{ secrets.DISTRIBUTION_REPO_TOKEN }}
+          DIST_REPO: ${{ secrets.DISTRIBUTION_REPO }}
         run: |
           TAG="${{ steps.version.outputs.tag }}"
           FORCE="${{ inputs.force_release }}"
 
           echo "🔍 Checking if tag $TAG exists in distribution repo..."
-          REPO_URL="https://x-access-token:${{ secrets.DISTRIBUTION_REPO_TOKEN }}@github.com/${{ secrets.DISTRIBUTION_REPO }}.git"
+          REPO_URL="https://x-access-token:${DIST_REPO_TOKEN}@github.com/${DIST_REPO}.git"
           TAG_CHECK=$(git ls-remote --tags "$REPO_URL" "refs/tags/${TAG}" 2>/dev/null || echo "")
 
           echo "   Result: ${TAG_CHECK:-empty}"
