@@ -49,9 +49,19 @@ PROJECT_PATH="${PROJECT_ROOT}/src/${PROJECT_NAME}.xcodeproj"
 OUTPUT_DIR="${SCRIPT_DIR}"
 BUILD_DIR="${OUTPUT_DIR}/Build"
 
-# DerivedData paths - reuse simulator build data for tests to speed up compilation
+# DerivedData paths
+# For build: use Build/DerivedData-Simulator
+# For test (CI mode): use separate DerivedData-Tests directory that matches CI cache
 BUILD_DERIVED_DATA_SIMULATOR="${OUTPUT_DIR}/Build/DerivedData-Simulator"
-DERIVED_DATA="${DERIVED_DATA_OVERRIDE:-$BUILD_DERIVED_DATA_SIMULATOR}"
+
+# In CI test mode, use a path that matches the workflow cache configuration
+if [ "$MODE" = "test" ] && [ -n "$CI" ]; then
+    # CI test job uses ios-sdk/DerivedData-Tests (relative to ios-sdk root)
+    DERIVED_DATA="${DERIVED_DATA_OVERRIDE:-${PROJECT_ROOT}/DerivedData-Tests}"
+else
+    # Local or build mode: use the simulator build DerivedData
+    DERIVED_DATA="${DERIVED_DATA_OVERRIDE:-$BUILD_DERIVED_DATA_SIMULATOR}"
+fi
 
 # Shared SourcePackages directory for all builds (speeds up dependency resolution)
 SHARED_SOURCE_PACKAGES="${PROJECT_ROOT}/SourcePackages"
@@ -444,15 +454,22 @@ EOF
 # ============================================================================
 
 run_tests() {
-    print_status "🧪 Running tests in CI environment..."
+    print_status "🧪 Running tests..."
     echo ""
 
-    # Reuse DerivedData from simulator build if available (speeds up significantly)
+    # Show DerivedData path being used
+    print_status "DerivedData path: $DERIVED_DATA"
+
+    # Check if DerivedData has cached build products
     if [ -d "$DERIVED_DATA/Build/Products" ]; then
-        echo "📦 Reusing DerivedData from simulator build - dependencies already compiled!"
+        echo "📦 Found existing DerivedData - reusing cached build products"
+        ls -la "$DERIVED_DATA/Build/Products/" 2>/dev/null | head -5 || true
     else
-        echo "📦 No existing DerivedData found, will compile dependencies during test"
+        echo "📦 No cached DerivedData found, will compile during test"
         mkdir -p "$DERIVED_DATA"
+        if [ -n "$CI" ]; then
+            echo "   (This is expected on first CI run - cache will speed up subsequent runs)"
+        fi
     fi
 
     # Clean old test results
