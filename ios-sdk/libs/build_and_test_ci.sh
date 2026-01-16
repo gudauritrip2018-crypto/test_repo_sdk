@@ -64,6 +64,107 @@ print_status "Project path: $PROJECT_PATH"
 print_status "Output directory: $OUTPUT_DIR"
 
 # ============================================================================
+# RELINK FUNCTION - Remove SPM dependencies from framework binary
+# ============================================================================
+
+relink_framework_without_spm() {
+    local DERIVED_DATA_PATH="$1"
+    local SDK="$2"  # iphoneos or iphonesimulator
+    local ARCH="$3" # arm64
+
+    print_status "🔗 Relinking framework without SPM dependencies ($SDK)..."
+
+    # Find the intermediates folder
+    local INTERMEDIATES="${DERIVED_DATA_PATH}/Build/Intermediates.noindex/AriseMobileSdk.build/Release-${SDK}/${FRAMEWORK_NAME}.build"
+    local OBJECTS_DIR="${INTERMEDIATES}/Objects-normal/${ARCH}"
+
+    if [ ! -d "$OBJECTS_DIR" ]; then
+        print_error "Objects directory not found: $OBJECTS_DIR"
+        return 1
+    fi
+
+    # Find the framework binary location
+    local FRAMEWORK_PATH="${DERIVED_DATA_PATH}/Build/Products/Release-${SDK}/${FRAMEWORK_NAME}.framework"
+    local FRAMEWORK_BINARY="${FRAMEWORK_PATH}/${FRAMEWORK_NAME}"
+
+    if [ ! -f "$FRAMEWORK_BINARY" ]; then
+        print_error "Framework binary not found: $FRAMEWORK_BINARY"
+        return 1
+    fi
+
+    # Backup original binary
+    cp "$FRAMEWORK_BINARY" "${FRAMEWORK_BINARY}.original"
+
+    # Find all .o files from our source code (not SPM dependencies)
+    # The LinkFileList contains all .o files that were linked
+    local LINK_FILE_LIST="${OBJECTS_DIR}/${FRAMEWORK_NAME}.LinkFileList"
+
+    if [ ! -f "$LINK_FILE_LIST" ]; then
+        print_warning "LinkFileList not found, searching for .o files manually..."
+        LINK_FILE_LIST="${BUILD_DIR}/manual_link_${SDK}.txt"
+        find "$OBJECTS_DIR" -name "*.o" -type f > "$LINK_FILE_LIST"
+    fi
+
+    print_status "Found $(wc -l < "$LINK_FILE_LIST" | xargs) object files"
+
+    # Get SDK path
+    local SDK_PATH
+    if [ "$SDK" = "iphoneos" ]; then
+        SDK_PATH=$(xcrun --sdk iphoneos --show-sdk-path)
+        TARGET="arm64-apple-ios17.6"
+    else
+        SDK_PATH=$(xcrun --sdk iphonesimulator --show-sdk-path)
+        TARGET="arm64-apple-ios17.6-simulator"
+    fi
+
+    # Get minimum iOS version from the original binary
+    local MIN_IOS_VERSION="17.6"
+
+    # Relink using clang - create dynamic framework WITHOUT SPM static libraries
+    print_status "Creating new framework binary without SPM dependencies..."
+
+    xcrun clang -target "$TARGET" \
+        -dynamiclib \
+        -isysroot "$SDK_PATH" \
+        -F"${OUTPUT_DIR}" \
+        -framework CloudCommerce \
+        -framework Foundation \
+        -framework UIKit \
+        -framework Security \
+        -framework CryptoKit \
+        -filelist "$LINK_FILE_LIST" \
+        -install_name "@rpath/${FRAMEWORK_NAME}.framework/${FRAMEWORK_NAME}" \
+        -Xlinker -rpath -Xlinker @executable_path/Frameworks \
+        -Xlinker -rpath -Xlinker @loader_path/Frameworks \
+        -fobjc-link-runtime \
+        -L"${SDK_PATH}/usr/lib/swift" \
+        -L"/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/${SDK}" \
+        -o "$FRAMEWORK_BINARY" \
+        2>&1 | tee "${BUILD_DIR}/relink_${SDK}.log"
+
+    RELINK_EXIT_CODE=${PIPESTATUS[0]}
+
+    if [ $RELINK_EXIT_CODE -ne 0 ]; then
+        print_warning "Relink failed, restoring original binary"
+        mv "${FRAMEWORK_BINARY}.original" "$FRAMEWORK_BINARY"
+        cat "${BUILD_DIR}/relink_${SDK}.log"
+        return 1
+    fi
+
+    # Clean up backup
+    rm -f "${FRAMEWORK_BINARY}.original"
+
+    print_success "Framework relinked successfully ($SDK)"
+
+    # Show what's in the new binary
+    print_status "Checking new binary symbols..."
+    nm "$FRAMEWORK_BINARY" 2>/dev/null | grep -c "OpenAPIRuntime" || echo "OpenAPIRuntime symbols: 0"
+    nm "$FRAMEWORK_BINARY" 2>/dev/null | grep -c "CryptoSwift" || echo "CryptoSwift symbols: 0"
+
+    return 0
+}
+
+# ============================================================================
 # BUILD SECTION
 # ============================================================================
 
@@ -209,7 +310,14 @@ EOF
         tail -100 "${BUILD_DIR}/device_build.log" || true
         exit 1
     fi
-    
+
+    # Relink framework without SPM dependencies (double-build trick)
+    if relink_framework_without_spm "$DEVICE_DERIVED_DATA" "iphoneos" "arm64"; then
+        print_success "Device framework relinked without SPM dependencies"
+    else
+        print_warning "Relink failed, using original framework (may have duplicate symbols)"
+    fi
+
     # Search for framework in DerivedData
     print_status "Searching for framework in DerivedData..."
     DEVICE_FRAMEWORK="${DEVICE_DERIVED_DATA}/Build/Products/Release-iphoneos/${FRAMEWORK_NAME}.framework"
@@ -253,7 +361,14 @@ EOF
         tail -50 "${BUILD_DIR}/simulator_build.log" || true
         exit 1
     fi
-    
+
+    # Relink framework without SPM dependencies (double-build trick)
+    if relink_framework_without_spm "$SIMULATOR_DERIVED_DATA" "iphonesimulator" "arm64"; then
+        print_success "Simulator framework relinked without SPM dependencies"
+    else
+        print_warning "Relink failed, using original framework (may have duplicate symbols)"
+    fi
+
     # Search for framework in DerivedData
     print_status "Searching for framework in DerivedData..."
     SIMULATOR_FRAMEWORK="${SIMULATOR_DERIVED_DATA}/Build/Products/Release-iphonesimulator/${FRAMEWORK_NAME}.framework"
