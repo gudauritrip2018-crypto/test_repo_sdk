@@ -11,6 +11,10 @@ set -e
 # Default mode
 MODE="${1:-both}"
 
+# Version from environment (set by CI) or default
+MARKETING_VERSION="${MARKETING_VERSION:-1.0.0}"
+BUILD_NUMBER="${BUILD_NUMBER:-1}"
+
 # Project name (name of Xcode project file)
 PROJECT_NAME="AriseMobileSdk"
 # Scheme name (name of the scheme in Xcode, not the target name)
@@ -322,6 +326,7 @@ EOF
 
     # Build for device
     print_status "Building scheme: ${SCHEME_NAME} for device..."
+    print_status "Version: ${MARKETING_VERSION} (build ${BUILD_NUMBER})"
     xcodebuild \
         -project "${PROJECT_PATH}" \
         -scheme "${SCHEME_NAME}" \
@@ -333,6 +338,8 @@ EOF
         $RESOLVE_FLAG \
         -skipPackagePluginValidation \
         -skipMacroValidation \
+        MARKETING_VERSION="${MARKETING_VERSION}" \
+        CURRENT_PROJECT_VERSION="${BUILD_NUMBER}" \
         build \
         2>&1 | tee "${BUILD_DIR}/device_build.log"
 
@@ -385,6 +392,8 @@ EOF
         -disableAutomaticPackageResolution \
         -skipPackagePluginValidation \
         -skipMacroValidation \
+        MARKETING_VERSION="${MARKETING_VERSION}" \
+        CURRENT_PROJECT_VERSION="${BUILD_NUMBER}" \
         build \
         2>&1 | tee "${BUILD_DIR}/simulator_build.log"
 
