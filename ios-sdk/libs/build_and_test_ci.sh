@@ -95,17 +95,28 @@ relink_framework_without_spm() {
     # Backup original binary
     cp "$FRAMEWORK_BINARY" "${FRAMEWORK_BINARY}.original"
 
-    # Find all .o files from our source code (not SPM dependencies)
-    # The LinkFileList contains all .o files that were linked
-    local LINK_FILE_LIST="${OBJECTS_DIR}/${FRAMEWORK_NAME}.LinkFileList"
+    # Find all .o files from our source code ONLY (not SPM dependencies)
+    # We need to filter out SPM dependency .o files
+    local FILTERED_LINK_FILE="${BUILD_DIR}/filtered_link_${SDK}.txt"
 
-    if [ ! -f "$LINK_FILE_LIST" ]; then
-        print_warning "LinkFileList not found, searching for .o files manually..."
-        LINK_FILE_LIST="${BUILD_DIR}/manual_link_${SDK}.txt"
-        find "$OBJECTS_DIR" -name "*.o" -type f > "$LINK_FILE_LIST"
+    # Find .o files ONLY in our framework's Objects directory (not in SourcePackages or other locations)
+    # This excludes CryptoSwift.o, OpenAPIRuntime.o, HTTPTypes.o, etc.
+    find "$OBJECTS_DIR" -maxdepth 1 -name "*.o" -type f > "$FILTERED_LINK_FILE"
+
+    local OBJ_COUNT=$(wc -l < "$FILTERED_LINK_FILE" | xargs)
+    print_status "Found $OBJ_COUNT object files (our code only, excluding SPM dependencies)"
+
+    if [ "$OBJ_COUNT" -eq 0 ]; then
+        print_error "No object files found in $OBJECTS_DIR"
+        return 1
     fi
 
-    print_status "Found $(wc -l < "$LINK_FILE_LIST" | xargs) object files"
+    # Show what we're linking
+    print_status "Object files to link:"
+    head -10 "$FILTERED_LINK_FILE"
+    if [ "$OBJ_COUNT" -gt 10 ]; then
+        print_status "... and $((OBJ_COUNT - 10)) more"
+    fi
 
     # Get SDK path and CloudCommerce framework path
     local SDK_PATH
@@ -130,6 +141,8 @@ relink_framework_without_spm() {
     # Relink using clang - create dynamic framework WITHOUT SPM static libraries
     print_status "Creating new framework binary without SPM dependencies..."
 
+    # Use -undefined dynamic_lookup to allow undefined symbols
+    # These will be resolved at runtime from the consuming app
     xcrun clang -target "$TARGET" \
         -dynamiclib \
         -isysroot "$SDK_PATH" \
@@ -139,11 +152,13 @@ relink_framework_without_spm() {
         -framework UIKit \
         -framework Security \
         -framework CryptoKit \
-        -filelist "$LINK_FILE_LIST" \
+        -filelist "$FILTERED_LINK_FILE" \
         -install_name "@rpath/${FRAMEWORK_NAME}.framework/${FRAMEWORK_NAME}" \
         -Xlinker -rpath -Xlinker @executable_path/Frameworks \
         -Xlinker -rpath -Xlinker @loader_path/Frameworks \
+        -Xlinker -undefined -Xlinker dynamic_lookup \
         -fobjc-link-runtime \
+        -fprofile-instr-generate \
         -L"${SDK_PATH}/usr/lib/swift" \
         -L"/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/${SDK}" \
         -o "$FRAMEWORK_BINARY" \
