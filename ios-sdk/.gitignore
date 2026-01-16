@@ -106,9 +106,9 @@ src/AriseMobileSdk/OpenAPI/generated/
 
 # Documentation
 docs/
-Distribution/
 AriseTestSdkDistribution/
 Documentations/
+# Distribution/ is needed for CI releases
 
 
 # Swift OpenAPI Generator generated files (auto-generated during build)
