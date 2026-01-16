@@ -38,6 +38,7 @@ jobs:
           xcode-version: latest-stable
 
       - name: Cache DerivedData and SourcePackages
+        id: cache
         uses: actions/cache@v4
         with:
           path: |
@@ -45,9 +46,21 @@ jobs:
             ios-sdk/SourcePackages
             ios-sdk/libs/Build
             ~/Library/Caches/org.swift.swiftpm
-          key: ${{ runner.os }}-xcode-v2-${{ hashFiles('ios-sdk/src/AriseMobileSdk.xcodeproj/project.pbxproj') }}
+          key: ${{ runner.os }}-xcode-v3-${{ hashFiles('ios-sdk/src/AriseMobileSdk.xcodeproj/project.pbxproj', 'ios-sdk/src/AriseMobileSdk.xcodeproj/project.xcworkspace/**') }}
           restore-keys: |
-            ${{ runner.os }}-xcode-v2-
+            ${{ runner.os }}-xcode-v3-
+
+      - name: Cache status
+        run: |
+          if [ "${{ steps.cache.outputs.cache-hit }}" == "true" ]; then
+            echo "✅ Cache restored successfully"
+            echo "Cached directories:"
+            ls -la ios-sdk/DerivedData-Tests 2>/dev/null | head -5 || echo "  DerivedData-Tests: not found"
+            ls -la ios-sdk/SourcePackages 2>/dev/null | head -5 || echo "  SourcePackages: not found"
+            ls -la ios-sdk/libs/Build 2>/dev/null | head -5 || echo "  libs/Build: not found"
+          else
+            echo "⚠️ Cache not found - first build will be slower"
+          fi
 
       - name: Verify Swift and Xcode versions
         run: |
