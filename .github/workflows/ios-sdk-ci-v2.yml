@@ -56,8 +56,15 @@ jobs:
         run: |
           echo "📥 Fetching tags from distribution repository..."
 
-          # Debug: show raw git ls-remote output
+          # Debug: show repo URL (without token)
+          REPO_NAME="${{ secrets.DISTRIBUTION_REPO }}"
           echo "═══════════════════════════════════════"
+          echo "🔗 Distribution repo: $REPO_NAME"
+          echo "🔗 Full URL: https://github.com/${REPO_NAME}.git"
+          echo "═══════════════════════════════════════"
+          echo ""
+
+          # Debug: show raw git ls-remote output
           echo "Raw git ls-remote output:"
           echo "═══════════════════════════════════════"
           RAW_OUTPUT=$(git ls-remote --tags "https://x-access-token:${{ secrets.DISTRIBUTION_REPO_TOKEN }}@github.com/${{ secrets.DISTRIBUTION_REPO }}.git" 2>&1) || true
