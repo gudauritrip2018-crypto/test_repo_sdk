@@ -97,9 +97,9 @@ iOSInjectionProject/
 # macOS
 .DS_Store
 
-# Frameworks (built output)
+# Frameworks (built output - AriseMobileSdk is built from source)
 AriseMobileSdk.xcframework
-CloudCommerce.xcframework
+# CloudCommerce.xcframework is needed for CI builds (external dependency)
 
 # OpenAPI Generated Code
 src/AriseMobileSdk/OpenAPI/generated/
