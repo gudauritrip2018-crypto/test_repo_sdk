@@ -64,60 +64,11 @@ print_status "Project path: $PROJECT_PATH"
 print_status "Output directory: $OUTPUT_DIR"
 
 # ============================================================================
-# SPM DEPENDENCY MANAGEMENT (for double-build trick)
-# ============================================================================
-
-PBXPROJ_PATH="${PROJECT_ROOT}/src/${PROJECT_NAME}.xcodeproj/project.pbxproj"
-PBXPROJ_BACKUP="${BUILD_DIR}/project.pbxproj.backup"
-
-# Remove SPM dependencies from project.pbxproj
-remove_spm_dependencies() {
-    print_status "🔧 Removing SPM dependencies from project..."
-
-    # Backup original
-    cp "$PBXPROJ_PATH" "$PBXPROJ_BACKUP"
-
-    # Create temp file
-    local TEMP_FILE="${BUILD_DIR}/project.pbxproj.tmp"
-
-    # Remove packageProductDependencies contents (keep empty array)
-    sed 's/packageProductDependencies = ([^)]*);/packageProductDependencies = ();/g' "$PBXPROJ_PATH" > "$TEMP_FILE"
-    mv "$TEMP_FILE" "$PBXPROJ_PATH"
-
-    # Remove packageReferences contents (keep empty array)
-    sed 's/packageReferences = ([^)]*);/packageReferences = ();/g' "$PBXPROJ_PATH" > "$TEMP_FILE"
-    mv "$TEMP_FILE" "$PBXPROJ_PATH"
-
-    # Remove XCRemoteSwiftPackageReference section
-    sed '/\/\* Begin XCRemoteSwiftPackageReference section \*\//,/\/\* End XCRemoteSwiftPackageReference section \*\//d' "$PBXPROJ_PATH" > "$TEMP_FILE"
-    mv "$TEMP_FILE" "$PBXPROJ_PATH"
-
-    # Remove XCSwiftPackageProductDependency section
-    sed '/\/\* Begin XCSwiftPackageProductDependency section \*\//,/\/\* End XCSwiftPackageProductDependency section \*\//d' "$PBXPROJ_PATH" > "$TEMP_FILE"
-    mv "$TEMP_FILE" "$PBXPROJ_PATH"
-
-    print_success "SPM dependencies removed from project"
-}
-
-# Restore original project.pbxproj
-restore_spm_dependencies() {
-    if [ -f "$PBXPROJ_BACKUP" ]; then
-        print_status "🔧 Restoring original project.pbxproj..."
-        cp "$PBXPROJ_BACKUP" "$PBXPROJ_PATH"
-        rm -f "$PBXPROJ_BACKUP"
-        print_success "Project restored"
-    fi
-}
-
-# Trap to restore on exit/error
-trap restore_spm_dependencies EXIT
-
-# ============================================================================
 # BUILD SECTION
 # ============================================================================
 
 build_framework() {
-    print_status "🔨 Building ${FRAMEWORK_NAME} framework (double-build to avoid duplicate symbols)..."
+    print_status "🔨 Building ${FRAMEWORK_NAME} framework..."
 
     DEVICE_DERIVED_DATA="${BUILD_DIR}/DerivedData-Device"
     SIMULATOR_DERIVED_DATA="${BUILD_DIR}/DerivedData-Simulator"
@@ -219,14 +170,8 @@ EOF
         print_status "Created CloudCommerce.xcframework stub"
     fi
     
-    # =========================================================================
-    # DOUBLE-BUILD TRICK FOR DEVICE
-    # Step 1: Build with SPM dependencies (compiles all .o files)
-    # Step 2: Remove SPM dependencies
-    # Step 3: Incremental build (links without static SPM libs)
-    # =========================================================================
-
-    print_status "📱 Building for device (arm64) - DOUBLE-BUILD to avoid duplicate symbols..."
+    # Build for device
+    print_status "📱 Building for device (arm64)..."
 
     # Reuse DerivedData to speed up builds
     print_status "Preparing DerivedData (reusing cached dependencies)..."
@@ -241,8 +186,8 @@ EOF
         RESOLVE_FLAG=""
     fi
 
-    # FIRST BUILD: with SPM dependencies (compiles all source files)
-    print_status "🔨 [1/2] First build WITH dependencies (compiling sources)..."
+    # Build for device
+    print_status "Building scheme: ${SCHEME_NAME} for device..."
     xcodebuild \
         -project "${PROJECT_PATH}" \
         -scheme "${SCHEME_NAME}" \
@@ -255,47 +200,15 @@ EOF
         -skipPackagePluginValidation \
         -skipMacroValidation \
         build \
-        2>&1 | tee "${BUILD_DIR}/device_build_1.log"
+        2>&1 | tee "${BUILD_DIR}/device_build.log"
 
     BUILD_EXIT_CODE=${PIPESTATUS[0]}
 
     if [ $BUILD_EXIT_CODE -ne 0 ]; then
-        print_error "Device build (step 1) failed with exit code: $BUILD_EXIT_CODE"
-        tail -100 "${BUILD_DIR}/device_build_1.log" || true
+        print_error "Device build failed with exit code: $BUILD_EXIT_CODE"
+        tail -100 "${BUILD_DIR}/device_build.log" || true
         exit 1
     fi
-
-    print_success "First build completed - all .o files compiled"
-
-    # Remove SPM dependencies from project
-    remove_spm_dependencies
-
-    # SECOND BUILD: without SPM dependencies (incremental - links without static libs)
-    print_status "🔨 [2/2] Second build WITHOUT dependencies (linking without static SPM libs)..."
-    xcodebuild \
-        -project "${PROJECT_PATH}" \
-        -scheme "${SCHEME_NAME}" \
-        -configuration Release \
-        -sdk iphoneos \
-        -arch arm64 \
-        -derivedDataPath "${DEVICE_DERIVED_DATA}" \
-        -skipPackagePluginValidation \
-        -skipMacroValidation \
-        build \
-        2>&1 | tee "${BUILD_DIR}/device_build_2.log"
-
-    BUILD_EXIT_CODE=${PIPESTATUS[0]}
-
-    # Restore project immediately after second build
-    restore_spm_dependencies
-
-    if [ $BUILD_EXIT_CODE -ne 0 ]; then
-        print_error "Device build (step 2) failed with exit code: $BUILD_EXIT_CODE"
-        tail -100 "${BUILD_DIR}/device_build_2.log" || true
-        exit 1
-    fi
-
-    print_success "Second build completed - framework linked without static SPM dependencies"
     
     # Search for framework in DerivedData
     print_status "Searching for framework in DerivedData..."
@@ -311,19 +224,15 @@ EOF
     
     print_success "Device framework found: $DEVICE_FRAMEWORK"
     
-    # =========================================================================
-    # DOUBLE-BUILD TRICK FOR SIMULATOR
-    # Same process as device build
-    # =========================================================================
-
-    print_status "📱 Building for simulator (arm64) - DOUBLE-BUILD to avoid duplicate symbols..."
+    # Build for simulator
+    print_status "📱 Building for simulator (arm64)..."
 
     # Reuse DerivedData to speed up builds
     print_status "Preparing DerivedData (reusing cached dependencies)..."
     mkdir -p "${SIMULATOR_DERIVED_DATA}"
 
-    # FIRST BUILD: with SPM dependencies (compiles all source files)
-    print_status "🔨 [1/2] First build WITH dependencies (compiling sources)..."
+    # Build for simulator (SourcePackages already resolved from device build)
+    print_status "Building scheme: ${SCHEME_NAME} for simulator..."
     xcodebuild \
         -project "${PROJECT_PATH}" \
         -scheme "${SCHEME_NAME}" \
@@ -336,46 +245,14 @@ EOF
         -skipPackagePluginValidation \
         -skipMacroValidation \
         build \
-        2>&1 | tee "${BUILD_DIR}/simulator_build_1.log"
+        2>&1 | tee "${BUILD_DIR}/simulator_build.log"
 
     BUILD_EXIT_CODE=${PIPESTATUS[0]}
     if [ $BUILD_EXIT_CODE -ne 0 ]; then
-        print_error "Simulator build (step 1) failed with exit code: $BUILD_EXIT_CODE"
-        tail -100 "${BUILD_DIR}/simulator_build_1.log" || true
+        print_error "Simulator build failed with exit code: $BUILD_EXIT_CODE"
+        tail -50 "${BUILD_DIR}/simulator_build.log" || true
         exit 1
     fi
-
-    print_success "First build completed - all .o files compiled"
-
-    # Remove SPM dependencies from project
-    remove_spm_dependencies
-
-    # SECOND BUILD: without SPM dependencies (incremental - links without static libs)
-    print_status "🔨 [2/2] Second build WITHOUT dependencies (linking without static SPM libs)..."
-    xcodebuild \
-        -project "${PROJECT_PATH}" \
-        -scheme "${SCHEME_NAME}" \
-        -configuration Release \
-        -destination "generic/platform=iOS Simulator" \
-        -sdk iphonesimulator \
-        -derivedDataPath "${SIMULATOR_DERIVED_DATA}" \
-        -skipPackagePluginValidation \
-        -skipMacroValidation \
-        build \
-        2>&1 | tee "${BUILD_DIR}/simulator_build_2.log"
-
-    BUILD_EXIT_CODE=${PIPESTATUS[0]}
-
-    # Restore project immediately after second build
-    restore_spm_dependencies
-
-    if [ $BUILD_EXIT_CODE -ne 0 ]; then
-        print_error "Simulator build (step 2) failed with exit code: $BUILD_EXIT_CODE"
-        tail -100 "${BUILD_DIR}/simulator_build_2.log" || true
-        exit 1
-    fi
-
-    print_success "Second build completed - framework linked without static SPM dependencies"
     
     # Search for framework in DerivedData
     print_status "Searching for framework in DerivedData..."
