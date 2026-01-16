@@ -55,15 +55,28 @@ jobs:
         id: version
         run: |
           echo "📥 Fetching tags from distribution repository..."
+
+          # Debug: show raw git ls-remote output
+          echo "Raw git ls-remote output (first 20 lines):"
+          git ls-remote --tags "https://x-access-token:${{ secrets.DISTRIBUTION_REPO_TOKEN }}@github.com/${{ secrets.DISTRIBUTION_REPO }}.git" 2>/dev/null | head -20 || echo "Failed to fetch tags"
+          echo ""
+
           # Fetch tags and deduplicate (annotated tags show twice: tag and tag^{})
           DIST_TAGS=$(git ls-remote --tags "https://x-access-token:${{ secrets.DISTRIBUTION_REPO_TOKEN }}@github.com/${{ secrets.DISTRIBUTION_REPO }}.git" 2>/dev/null | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+(-uat)?' | sort -Vu || echo "")
 
-          echo "Available tags:"
-          echo "$DIST_TAGS" | tail -10
+          echo "📋 Extracted and deduplicated tags:"
+          if [ -n "$DIST_TAGS" ]; then
+            echo "$DIST_TAGS"
+          else
+            echo "(no tags found)"
+          fi
+          echo ""
 
+          # Find last production tag (no -uat suffix)
           LAST_PROD_TAG=$(echo "$DIST_TAGS" | grep -v '\-uat' | sort -V | tail -1)
           if [ -z "$LAST_PROD_TAG" ]; then
             LAST_PROD_TAG="v1.0.0"
+            echo "⚠️ No production tags found, using default: $LAST_PROD_TAG"
           fi
 
           echo "📌 Last production tag: $LAST_PROD_TAG"
@@ -71,6 +84,7 @@ jobs:
           VERSION=${LAST_PROD_TAG#v}
           MAJOR=$(echo $VERSION | cut -d. -f1)
           MINOR=$(echo $VERSION | cut -d. -f2)
+          echo "📐 Parsed: MAJOR=$MAJOR, MINOR=$MINOR"
 
           RELEASE_TYPE="${{ steps.release_type.outputs.type }}"
 
@@ -78,23 +92,42 @@ jobs:
             NEW_MINOR=$((MINOR + 1))
             NEW_VERSION="${MAJOR}.${NEW_MINOR}.0"
             TAG="v${NEW_VERSION}"
-            echo "📦 Production: $NEW_VERSION"
+            echo "📦 Production release: $NEW_VERSION"
           else
-            # Use extended regex and match at least one digit for patch version
-            LAST_UAT_TAG=$(echo "$DIST_TAGS" | grep -E "^v${MAJOR}\.${MINOR}\.[0-9]+-uat$" | sort -V | tail -1)
-            echo "🔍 Looking for UAT tags matching: v${MAJOR}.${MINOR}.*-uat"
-            echo "🔍 Found: ${LAST_UAT_TAG:-none}"
+            # Find last UAT tag for this major.minor version
+            UAT_PATTERN="^v${MAJOR}\.${MINOR}\.[0-9]+-uat$"
+            echo "🔍 Searching for UAT tags matching pattern: $UAT_PATTERN"
+
+            # Debug: show all UAT tags
+            ALL_UAT=$(echo "$DIST_TAGS" | grep '\-uat' || echo "")
+            if [ -n "$ALL_UAT" ]; then
+              echo "   All UAT tags found:"
+              echo "$ALL_UAT" | sed 's/^/   - /'
+            else
+              echo "   No UAT tags found in distribution repo"
+            fi
+
+            LAST_UAT_TAG=$(echo "$DIST_TAGS" | grep -E "$UAT_PATTERN" | sort -V | tail -1)
+            echo "🔍 Last UAT tag for v${MAJOR}.${MINOR}.x: ${LAST_UAT_TAG:-none}"
 
             if [ -z "$LAST_UAT_TAG" ]; then
               NEW_PATCH=1
+              echo "   Starting new UAT series at patch 1"
             else
               UAT_PATCH=$(echo ${LAST_UAT_TAG#v} | cut -d. -f3 | cut -d- -f1)
               NEW_PATCH=$((UAT_PATCH + 1))
+              echo "   Incrementing from patch $UAT_PATCH to $NEW_PATCH"
             fi
             NEW_VERSION="${MAJOR}.${MINOR}.${NEW_PATCH}"
             TAG="v${NEW_VERSION}-uat"
-            echo "🧪 UAT: $NEW_VERSION-uat (patch: $NEW_PATCH)"
+            echo "🧪 UAT release: $TAG"
           fi
+
+          echo ""
+          echo "═══════════════════════════════════════"
+          echo "📦 FINAL VERSION: $NEW_VERSION"
+          echo "🏷️  FINAL TAG: $TAG"
+          echo "═══════════════════════════════════════"
 
           echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
           echo "tag=$TAG" >> $GITHUB_OUTPUT
@@ -105,28 +138,29 @@ jobs:
           TAG="${{ steps.version.outputs.tag }}"
           FORCE="${{ inputs.force_release }}"
 
-          # Check in distribution repo - look for exact tag match
-          echo "🔍 Checking if tag $TAG exists..."
+          echo "🔍 Checking if tag $TAG exists in distribution repo..."
           REPO_URL="https://x-access-token:${{ secrets.DISTRIBUTION_REPO_TOKEN }}@github.com/${{ secrets.DISTRIBUTION_REPO }}.git"
           TAG_CHECK=$(git ls-remote --tags "$REPO_URL" "refs/tags/${TAG}" 2>/dev/null || echo "")
 
+          echo "   Tag check result: ${TAG_CHECK:-empty}"
+
           if [ -n "$TAG_CHECK" ] && [ "$FORCE" != "true" ]; then
             echo "should_release=false" >> $GITHUB_OUTPUT
-            echo "⚠️ Tag $TAG already exists in distribution repo, skipping release"
-            echo "   (use force_release=true to override)"
+            echo "⚠️ Tag $TAG already exists in distribution repo"
+            echo "   Skipping release (use force_release=true to override)"
           else
             echo "should_release=true" >> $GITHUB_OUTPUT
-            echo "✅ Tag $TAG does not exist, will create release"
+            echo "✅ Tag $TAG does not exist, proceeding with release"
           fi
 
 # ===========================================
-# JOB 2: TEST - Run tests (parallel)
+# JOB 2: BUILD & TEST - Combined for efficiency
 # ===========================================
-  test:
+  build-and-test:
     needs: setup
     if: needs.setup.outputs.should_release == 'true'
     runs-on: macos-15
-    timeout-minutes: 30
+    timeout-minutes: 45
 
     steps:
       - name: Checkout
@@ -137,66 +171,23 @@ jobs:
         with:
           xcode-version: latest-stable
 
-      - name: Cache for Tests
+      - name: Cache SourcePackages
         uses: actions/cache@v4
         with:
           path: |
-            ios-sdk/DerivedData-Tests
             ios-sdk/SourcePackages
             ~/Library/Caches/org.swift.swiftpm
-          key: ${{ runner.os }}-test-v1-${{ hashFiles('ios-sdk/src/AriseMobileSdk.xcodeproj/project.pbxproj') }}
+          key: ${{ runner.os }}-spm-v2-${{ hashFiles('ios-sdk/src/AriseMobileSdk.xcodeproj/project.pbxproj') }}
           restore-keys: |
-            ${{ runner.os }}-test-v1-
+            ${{ runner.os }}-spm-v2-
 
-      - name: Boot Simulator
-        run: |
-          SIMULATOR_ID=$(xcrun simctl list devices available | grep "iPhone" | head -1 | sed 's/.*(\([A-F0-9-]*\)).*/\1/')
-          xcrun simctl boot "$SIMULATOR_ID" 2>/dev/null || true
-          echo "✅ Simulator ready"
-
-      - name: Run Tests
-        run: |
-          cd ios-sdk/libs
-          chmod +x build_and_test_ci.sh
-          ./build_and_test_ci.sh test
-
-      - name: Upload Test Results
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: test-results
-          path: ios-sdk/test-results.xcresult
-          retention-days: 30
-          if-no-files-found: warn
-
-# ===========================================
-# JOB 3: BUILD - Build framework (parallel)
-# ===========================================
-  build:
-    needs: setup
-    if: needs.setup.outputs.should_release == 'true'
-    runs-on: macos-15
-    timeout-minutes: 30
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Xcode
-        uses: maxim-lobanov/setup-xcode@v1
-        with:
-          xcode-version: latest-stable
-
-      - name: Cache for Build
+      - name: Cache Build DerivedData
         uses: actions/cache@v4
         with:
-          path: |
-            ios-sdk/libs/Build
-            ios-sdk/SourcePackages
-            ~/Library/Caches/org.swift.swiftpm
-          key: ${{ runner.os }}-build-v1-${{ hashFiles('ios-sdk/src/AriseMobileSdk.xcodeproj/project.pbxproj') }}
+          path: ios-sdk/libs/Build
+          key: ${{ runner.os }}-build-v2-${{ hashFiles('ios-sdk/src/AriseMobileSdk.xcodeproj/project.pbxproj') }}
           restore-keys: |
-            ${{ runner.os }}-build-v1-
+            ${{ runner.os }}-build-v2-
 
       - name: Update Info.plist version
         run: |
@@ -211,6 +202,27 @@ jobs:
           ./build_and_test_ci.sh build
           echo "✅ Framework built"
 
+      - name: Boot Simulator
+        run: |
+          SIMULATOR_ID=$(xcrun simctl list devices available | grep "iPhone" | head -1 | sed 's/.*(\([A-F0-9-]*\)).*/\1/')
+          xcrun simctl boot "$SIMULATOR_ID" 2>/dev/null || true
+          echo "✅ Simulator ready: $SIMULATOR_ID"
+
+      - name: Run Tests
+        run: |
+          cd ios-sdk/libs
+          # Tests reuse DerivedData from build - should be fast
+          ./build_and_test_ci.sh test
+
+      - name: Upload Test Results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: ios-sdk/test-results.xcresult
+          retention-days: 30
+          if-no-files-found: warn
+
       - name: Prepare Distribution
         run: |
           mkdir -p ios-sdk/Distribution/libs
@@ -218,14 +230,17 @@ jobs:
           # Copy AriseMobile framework
           if [ -d "ios-sdk/libs/AriseMobile.xcframework" ]; then
             cp -R ios-sdk/libs/AriseMobile.xcframework ios-sdk/Distribution/libs/
+            echo "✅ AriseMobile.xcframework copied"
           fi
 
           # Copy CloudCommerce framework
           if [ -d "ios-sdk/libs/CloudCommerce.xcframework" ]; then
             cp -R ios-sdk/libs/CloudCommerce.xcframework ios-sdk/Distribution/libs/
+            echo "✅ CloudCommerce.xcframework copied"
           fi
 
-          echo "✅ Frameworks prepared"
+          echo ""
+          echo "📦 Distribution contents:"
           ls -lh ios-sdk/Distribution/libs/
 
       - name: Create Archive
@@ -242,7 +257,7 @@ jobs:
 
           zip -r "$ARCHIVE" libs/
           echo "archive_name=$ARCHIVE" >> $GITHUB_ENV
-          echo "✅ Archive: $ARCHIVE"
+          echo "✅ Archive created: $ARCHIVE"
 
       - name: Upload Build Artifact
         uses: actions/upload-artifact@v4
@@ -252,10 +267,10 @@ jobs:
           retention-days: 1
 
 # ===========================================
-# JOB 4: RELEASE - Publish (after test + build)
+# JOB 3: RELEASE - Publish to distribution repo
 # ===========================================
   release:
-    needs: [setup, test, build]
+    needs: [setup, build-and-test]
     if: needs.setup.outputs.should_release == 'true'
     runs-on: macos-15
     timeout-minutes: 15
@@ -292,7 +307,7 @@ jobs:
       - name: Copy Files
         run: |
           # Copy Package.swift and Sources
-          cp distribution-files/Package.swift distribution-repo/
+          cp distribution-files/Package.swift distribution-repo/ 2>/dev/null || true
           cp distribution-files/README.md distribution-repo/ 2>/dev/null || true
 
           mkdir -p distribution-repo/Sources
@@ -303,7 +318,7 @@ jobs:
           rm -rf distribution-repo/libs/*
           cp -R distribution-files/libs/* distribution-repo/libs/
 
-          echo "✅ Files copied"
+          echo "✅ Files copied to distribution repo"
 
       - name: Commit and Push
         working-directory: distribution-repo
@@ -311,7 +326,7 @@ jobs:
           git add .
 
           if git diff --staged --quiet; then
-            echo "No changes"
+            echo "ℹ️ No changes to commit"
           else
             TYPE="${{ needs.setup.outputs.release_type }}"
             VERSION="${{ needs.setup.outputs.version }}"
@@ -322,7 +337,7 @@ jobs:
               git commit -m "Production release v${VERSION}"
             fi
             git push -u origin main
-            echo "✅ Pushed"
+            echo "✅ Changes pushed to distribution repo"
           fi
 
       - name: Create Tag
@@ -333,13 +348,13 @@ jobs:
 
           # Safety check - verify tag doesn't exist locally or remotely
           if git rev-parse "$TAG" >/dev/null 2>&1; then
-            echo "⚠️ Tag $TAG already exists locally, deleting..."
+            echo "⚠️ Tag $TAG exists locally, removing..."
             git tag -d "$TAG"
           fi
 
           if git ls-remote --tags origin "refs/tags/${TAG}" | grep -q .; then
-            echo "⚠️ Tag $TAG already exists remotely, skipping tag creation"
-            echo "   Release will use existing tag"
+            echo "⚠️ Tag $TAG already exists remotely"
+            echo "   Using existing tag for release"
           else
             if [[ "$TYPE" == "uat" ]]; then
               git tag -a "$TAG" -m "UAT Release $TAG"

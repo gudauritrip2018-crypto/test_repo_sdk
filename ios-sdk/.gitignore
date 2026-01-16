@@ -53,6 +53,13 @@ coverage/test-results.xcresult/
 
 .build/
 
+# SPM SourcePackages (downloaded dependencies)
+SourcePackages/
+
+# Build artifacts (DerivedData, compiled frameworks)
+libs/Build/
+DerivedData-Tests/
+
 # CocoaPods
 #
 # We recommend against adding the Pods directory to your .gitignore. However
