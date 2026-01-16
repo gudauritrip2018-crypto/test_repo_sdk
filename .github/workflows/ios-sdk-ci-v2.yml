@@ -254,8 +254,18 @@ jobs:
       - name: Update Info.plist version
         run: |
           PLIST_PATH="ios-sdk/src/AriseMobileSdk/AriseMobileSdk-Info.plist"
-          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString ${{ needs.setup.outputs.version }}" "$PLIST_PATH"
-          echo "✅ Version set to ${{ needs.setup.outputs.version }}"
+          VERSION="${{ needs.setup.outputs.version }}"
+          TAG="${{ needs.setup.outputs.tag }}"
+          BUILD_NUMBER="${{ github.run_number }}"
+
+          # CFBundleShortVersionString = marketing version (e.g., 1.1.3)
+          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" "$PLIST_PATH"
+
+          # CFBundleVersion = build number (incrementing)
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD_NUMBER" "$PLIST_PATH"
+
+          echo "✅ Version: $VERSION (build $BUILD_NUMBER)"
+          echo "✅ Tag: $TAG"
 
       - name: Build XCFramework
         run: |
