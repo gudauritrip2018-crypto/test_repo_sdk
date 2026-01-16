@@ -173,24 +173,21 @@ EOF
     # Build for device
     print_status "📱 Building for device (arm64)..."
     
-    # Reuse DerivedData to speed up builds (don't clean unless necessary)
+    # Reuse DerivedData to speed up builds
     print_status "Preparing DerivedData (reusing cached dependencies)..."
     mkdir -p "${DEVICE_DERIVED_DATA}"
-    
-    # Resolve package dependencies separately first (using shared SourcePackages)
-    print_status "Resolving package dependencies..."
-    xcodebuild \
-        -project "${PROJECT_PATH}" \
-        -scheme "${SCHEME_NAME}" \
-        -configuration Release \
-        -sdk iphoneos \
-        -derivedDataPath "${DEVICE_DERIVED_DATA}" \
-        -clonedSourcePackagesDirPath "${SHARED_SOURCE_PACKAGES}" \
-        -resolvePackageDependencies \
-        2>&1 | tee "${BUILD_DIR}/device_resolve.log" || true
+
+    # Check if SourcePackages already cached
+    if [ -d "${SHARED_SOURCE_PACKAGES}/checkouts" ]; then
+        print_success "Using cached SourcePackages"
+        RESOLVE_FLAG="-disableAutomaticPackageResolution"
+    else
+        print_status "Will resolve dependencies during build"
+        RESOLVE_FLAG=""
+    fi
 
     # Build for device
-    print_status "Building scheme: ${SCHEME_NAME}..."
+    print_status "Building scheme: ${SCHEME_NAME} for device..."
     xcodebuild \
         -project "${PROJECT_PATH}" \
         -scheme "${SCHEME_NAME}" \
@@ -199,6 +196,9 @@ EOF
         -arch arm64 \
         -derivedDataPath "${DEVICE_DERIVED_DATA}" \
         -clonedSourcePackagesDirPath "${SHARED_SOURCE_PACKAGES}" \
+        $RESOLVE_FLAG \
+        -skipPackagePluginValidation \
+        -skipMacroValidation \
         build \
         2>&1 | tee "${BUILD_DIR}/device_build.log"
     
@@ -227,23 +227,11 @@ EOF
     # Build for simulator
     print_status "📱 Building for simulator (arm64)..."
 
-    # Reuse DerivedData to speed up builds (don't clean unless necessary)
+    # Reuse DerivedData to speed up builds
     print_status "Preparing DerivedData (reusing cached dependencies)..."
     mkdir -p "${SIMULATOR_DERIVED_DATA}"
-    
-    # Resolve package dependencies separately first (using shared SourcePackages)
-    print_status "Resolving package dependencies..."
-    xcodebuild \
-        -project "${PROJECT_PATH}" \
-        -scheme "${SCHEME_NAME}" \
-        -configuration Release \
-        -sdk iphonesimulator \
-        -derivedDataPath "${SIMULATOR_DERIVED_DATA}" \
-        -clonedSourcePackagesDirPath "${SHARED_SOURCE_PACKAGES}" \
-        -resolvePackageDependencies \
-        2>&1 | tee "${BUILD_DIR}/simulator_resolve.log" || true
 
-    # Build for simulator
+    # Build for simulator (SourcePackages already resolved from device build)
     print_status "Building scheme: ${SCHEME_NAME} for simulator..."
     xcodebuild \
         -project "${PROJECT_PATH}" \
@@ -253,6 +241,9 @@ EOF
         -sdk iphonesimulator \
         -derivedDataPath "${SIMULATOR_DERIVED_DATA}" \
         -clonedSourcePackagesDirPath "${SHARED_SOURCE_PACKAGES}" \
+        -disableAutomaticPackageResolution \
+        -skipPackagePluginValidation \
+        -skipMacroValidation \
         build \
         2>&1 | tee "${BUILD_DIR}/simulator_build.log"
     
@@ -322,7 +313,7 @@ run_tests() {
     echo "🧹 Preparing test environment..."
     
     # Check if precompiled SourcePackages exist in repository
-    REPO_SOURCE_PACKAGES="$PROJECT_ROOT/ios-sdk/libs/SourcePackages"
+    REPO_SOURCE_PACKAGES="$PROJECT_ROOT/libs/SourcePackages"
     if [ -d "$REPO_SOURCE_PACKAGES" ]; then
         echo "📦 Found precompiled SourcePackages in repository, using them..."
         # Copy precompiled SourcePackages to DerivedData
@@ -513,35 +504,21 @@ run_tests() {
     # Show final destination being used
     echo "📍 Final destination: $DESTINATION"
     echo ""
-    
-    # Resolve package dependencies first to cache them (using shared SourcePackages)
-    echo ""
-    echo "📦 Resolving Swift Package dependencies..."
-    echo "ℹ️  This will cache dependencies and speed up test compilation"
-    xcodebuild \
-        -project "$PROJECT_PATH" \
-        -scheme "$SCHEME_NAME" \
-        -configuration Debug \
-        -destination "$DESTINATION" \
-        -derivedDataPath "$DERIVED_DATA" \
-        -clonedSourcePackagesDirPath "${SHARED_SOURCE_PACKAGES}" \
-        -resolvePackageDependencies \
-        2>&1 | tee /tmp/test_resolve.log || true
-    
-    echo ""
-    echo "✅ Package dependencies resolved"
-    echo ""
-    
-    # Run tests with progress logging
-    echo ""
+
+    # Run tests (dependencies resolved automatically during build)
     echo "🧪 Running tests..."
-    echo "ℹ️  This may take a while - compiling Swift Package dependencies..."
-    echo "ℹ️  If it seems stuck, it's likely just compiling (swift-crypto, swift-openapi-runtime, etc.)"
-    echo "ℹ️  Progress will be shown below - look for 'Compiling', 'Linking', or 'Building' messages"
-    echo "ℹ️  Large modules like CCryptoBoringSSL can take 10-30 minutes to link"
+
+    # Check if SourcePackages already cached
+    if [ -d "${SHARED_SOURCE_PACKAGES}/checkouts" ]; then
+        echo "✅ Using cached SourcePackages"
+        RESOLVE_FLAG="-disableAutomaticPackageResolution"
+    else
+        echo "📦 Will resolve dependencies during build"
+        RESOLVE_FLAG=""
+    fi
     echo ""
-    
-    # Run xcodebuild test with output to both file and stdout
+
+    # Run xcodebuild test
     xcodebuild test \
         -project "$PROJECT_PATH" \
         -scheme "$SCHEME_NAME" \
@@ -549,11 +526,11 @@ run_tests() {
         -destination "$DESTINATION" \
         -derivedDataPath "$DERIVED_DATA" \
         -clonedSourcePackagesDirPath "${SHARED_SOURCE_PACKAGES}" \
-        -enableCodeCoverage YES \
+        $RESOLVE_FLAG \
+        -skipPackagePluginValidation \
+        -skipMacroValidation \
         -resultBundlePath "$PROJECT_ROOT/test-results.xcresult" \
-        -onlyUsePackageVersionsFromResolvedFile \
         -parallel-testing-enabled NO \
-        -showBuildTimingSummary \
         2>&1 | tee /tmp/test_output.log
     
     TEST_EXIT_CODE=${PIPESTATUS[0]}
