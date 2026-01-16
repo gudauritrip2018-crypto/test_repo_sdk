@@ -374,11 +374,11 @@ struct ContentView: View {
         
         
         // Andriy
-//        let clientId = "550d101e-48f0-4be7-8083-ac68e9805780"
-//        let clientSecret = "31771069-4d24-45af-b73d-69cf9e559985"
+        let clientId = "550d101e-48f0-4be7-8083-ac68e9805780"
+        let clientSecret = "31771069-4d24-45af-b73d-69cf9e559985"
         
-        let clientId = "e979b249-2223-4bde-9ff9-b9f427bef45b"
-        let clientSecret = "b608dd76-97e4-453c-a2f2-54b6b8ad81a8"
+//        let clientId = "e979b249-2223-4bde-9ff9-b9f427bef45b"
+//        let clientSecret = "b608dd76-97e4-453c-a2f2-54b6b8ad81a8"
           
         //Alex's Car Wash
 //        let clientId = "05464bc9-58d9-4dd9-ba8b-fa9f595830c3"
