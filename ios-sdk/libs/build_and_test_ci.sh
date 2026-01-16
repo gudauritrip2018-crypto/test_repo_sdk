@@ -107,18 +107,25 @@ relink_framework_without_spm() {
 
     print_status "Found $(wc -l < "$LINK_FILE_LIST" | xargs) object files"
 
-    # Get SDK path
+    # Get SDK path and CloudCommerce framework path
     local SDK_PATH
+    local CLOUDCOMMERCE_FRAMEWORK_PATH
     if [ "$SDK" = "iphoneos" ]; then
         SDK_PATH=$(xcrun --sdk iphoneos --show-sdk-path)
         TARGET="arm64-apple-ios17.6"
+        CLOUDCOMMERCE_FRAMEWORK_PATH="${OUTPUT_DIR}/CloudCommerce.xcframework/ios-arm64"
     else
         SDK_PATH=$(xcrun --sdk iphonesimulator --show-sdk-path)
         TARGET="arm64-apple-ios17.6-simulator"
+        # Simulator might be ios-arm64_x86_64-simulator or ios-arm64-simulator
+        if [ -d "${OUTPUT_DIR}/CloudCommerce.xcframework/ios-arm64_x86_64-simulator" ]; then
+            CLOUDCOMMERCE_FRAMEWORK_PATH="${OUTPUT_DIR}/CloudCommerce.xcframework/ios-arm64_x86_64-simulator"
+        else
+            CLOUDCOMMERCE_FRAMEWORK_PATH="${OUTPUT_DIR}/CloudCommerce.xcframework/ios-arm64-simulator"
+        fi
     fi
 
-    # Get minimum iOS version from the original binary
-    local MIN_IOS_VERSION="17.6"
+    print_status "CloudCommerce path: $CLOUDCOMMERCE_FRAMEWORK_PATH"
 
     # Relink using clang - create dynamic framework WITHOUT SPM static libraries
     print_status "Creating new framework binary without SPM dependencies..."
@@ -126,7 +133,7 @@ relink_framework_without_spm() {
     xcrun clang -target "$TARGET" \
         -dynamiclib \
         -isysroot "$SDK_PATH" \
-        -F"${OUTPUT_DIR}" \
+        -F"${CLOUDCOMMERCE_FRAMEWORK_PATH}" \
         -framework CloudCommerce \
         -framework Foundation \
         -framework UIKit \
