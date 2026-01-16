@@ -1,8 +1,5 @@
 name: iOS SDK CI (UAT/Production)
 
-# Trigger on push to main (UAT) or release (Production) branches
-# - main branch: UAT releases with patch version increment (e.g., v1.2.1-uat)
-# - release branch: Production releases with minor version increment (e.g., v1.3.0)
 on:
   push:
     branches:
@@ -20,65 +17,30 @@ on:
         type: boolean
         default: false
 
+# ===========================================
+# JOB 1: SETUP - Determine version and release type
+# ===========================================
 jobs:
-  build-test-and-release:
+  setup:
     runs-on: macos-15
-    timeout-minutes: 120
+    timeout-minutes: 10
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+      release_type: ${{ steps.release_type.outputs.type }}
+      prerelease: ${{ steps.release_type.outputs.prerelease }}
+      should_release: ${{ steps.check_tag.outputs.should_release }}
 
     steps:
-      - name: Checkout source repository
+      - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          token: ${{ secrets.DISTRIBUTION_REPO_TOKEN }}
-
-      - name: Setup Xcode
-        uses: maxim-lobanov/setup-xcode@v1
-        with:
-          xcode-version: latest-stable
-
-      - name: Cache DerivedData and SourcePackages
-        id: cache
-        uses: actions/cache@v4
-        with:
-          path: |
-            ios-sdk/DerivedData-Tests
-            ios-sdk/SourcePackages
-            ios-sdk/libs/Build
-            ~/Library/Caches/org.swift.swiftpm
-          key: ${{ runner.os }}-xcode-v3-${{ hashFiles('ios-sdk/src/AriseMobileSdk.xcodeproj/project.pbxproj', 'ios-sdk/src/AriseMobileSdk.xcodeproj/project.xcworkspace/**') }}
-          restore-keys: |
-            ${{ runner.os }}-xcode-v3-
-
-      - name: Cache status
-        run: |
-          if [ "${{ steps.cache.outputs.cache-hit }}" == "true" ]; then
-            echo "✅ Cache restored successfully"
-            echo "Cached directories:"
-            ls -la ios-sdk/DerivedData-Tests 2>/dev/null | head -5 || echo "  DerivedData-Tests: not found"
-            ls -la ios-sdk/SourcePackages 2>/dev/null | head -5 || echo "  SourcePackages: not found"
-            ls -la ios-sdk/libs/Build 2>/dev/null | head -5 || echo "  libs/Build: not found"
-          else
-            echo "⚠️ Cache not found - first build will be slower"
-          fi
-
-      - name: Verify Swift and Xcode versions
-        run: |
-          echo "Xcode version:"
-          xcodebuild -version
-          echo ""
-          echo "Swift version:"
-          swift --version
-
-      # ===========================================
-      # RELEASE TYPE DETECTION
-      # ===========================================
 
       - name: Determine release type
         id: release_type
         run: |
           BRANCH="${{ github.ref_name }}"
-
           if [[ "$BRANCH" == "release" ]]; then
             echo "type=production" >> $GITHUB_OUTPUT
             echo "prerelease=false" >> $GITHUB_OUTPUT
@@ -89,438 +51,321 @@ jobs:
             echo "🧪 Release type: UAT"
           fi
 
-          echo "Branch: $BRANCH"
-
-      # ===========================================
-      # VERSION CALCULATION
-      # ===========================================
-
       - name: Calculate next version
-        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
         id: version
         run: |
-          # Fetch tags from distribution repository (where releases are published)
           echo "📥 Fetching tags from distribution repository..."
           DIST_TAGS=$(git ls-remote --tags "https://x-access-token:${{ secrets.DISTRIBUTION_REPO_TOKEN }}@github.com/${{ secrets.DISTRIBUTION_REPO }}.git" 2>/dev/null | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+(-uat)?' | sort -V || echo "")
 
-          echo "Available tags in distribution repo:"
+          echo "Available tags:"
           echo "$DIST_TAGS" | tail -10
 
-          # Get the last production tag (without -uat suffix)
           LAST_PROD_TAG=$(echo "$DIST_TAGS" | grep -v '\-uat' | sort -V | tail -1)
-
           if [ -z "$LAST_PROD_TAG" ]; then
             LAST_PROD_TAG="v1.0.0"
-            echo "⚠️  No previous production tags found, starting from v1.0.0"
           fi
 
           echo "📌 Last production tag: $LAST_PROD_TAG"
 
-          # Parse version components
           VERSION=${LAST_PROD_TAG#v}
           MAJOR=$(echo $VERSION | cut -d. -f1)
           MINOR=$(echo $VERSION | cut -d. -f2)
-          PATCH=$(echo $VERSION | cut -d. -f3)
-
-          echo "   Major: $MAJOR, Minor: $MINOR, Patch: $PATCH"
 
           RELEASE_TYPE="${{ steps.release_type.outputs.type }}"
 
           if [[ "$RELEASE_TYPE" == "production" ]]; then
-            # Production release: increment minor, reset patch
             NEW_MINOR=$((MINOR + 1))
             NEW_VERSION="${MAJOR}.${NEW_MINOR}.0"
             TAG="v${NEW_VERSION}"
-            echo "📦 Production release: minor++ → $NEW_VERSION"
+            echo "📦 Production: $NEW_VERSION"
           else
-            # UAT release: increment patch from last UAT for current minor version
             LAST_UAT_TAG=$(echo "$DIST_TAGS" | grep "v${MAJOR}\.${MINOR}\.[0-9]*-uat" | sort -V | tail -1)
-
             if [ -z "$LAST_UAT_TAG" ]; then
-              # First UAT after production release, start with patch=1
               NEW_PATCH=1
-              echo "   First UAT after production release"
             else
-              # Increment patch from last UAT
-              UAT_VERSION=${LAST_UAT_TAG#v}
-              UAT_PATCH=$(echo $UAT_VERSION | cut -d. -f3 | cut -d- -f1)
+              UAT_PATCH=$(echo ${LAST_UAT_TAG#v} | cut -d. -f3 | cut -d- -f1)
               NEW_PATCH=$((UAT_PATCH + 1))
-              echo "   Last UAT tag: $LAST_UAT_TAG → patch=$NEW_PATCH"
             fi
-
             NEW_VERSION="${MAJOR}.${MINOR}.${NEW_PATCH}"
             TAG="v${NEW_VERSION}-uat"
-            echo "🧪 UAT release: patch++ → $NEW_VERSION-uat"
+            echo "🧪 UAT: $NEW_VERSION-uat"
           fi
-
-          echo ""
-          echo "✅ New version: $NEW_VERSION"
-          echo "🏷️  Tag: $TAG"
 
           echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
           echo "tag=$TAG" >> $GITHUB_OUTPUT
 
-      - name: Check if tag already exists
-        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+      - name: Check if tag exists
         id: check_tag
         run: |
           TAG="${{ steps.version.outputs.tag }}"
           FORCE="${{ inputs.force_release }}"
 
-          if git rev-parse "$TAG" >/dev/null 2>&1; then
-            if [[ "$FORCE" == "true" ]]; then
-              echo "exists=false" >> $GITHUB_OUTPUT
-              echo "⚠️  Tag $TAG exists but force_release=true, proceeding"
-            else
-              echo "exists=true" >> $GITHUB_OUTPUT
-              echo "⚠️  Tag $TAG already exists, skipping release"
-            fi
+          # Check in distribution repo
+          EXISTS=$(git ls-remote --tags "https://x-access-token:${{ secrets.DISTRIBUTION_REPO_TOKEN }}@github.com/${{ secrets.DISTRIBUTION_REPO }}.git" "$TAG" 2>/dev/null | wc -l)
+
+          if [ "$EXISTS" -gt 0 ] && [ "$FORCE" != "true" ]; then
+            echo "should_release=false" >> $GITHUB_OUTPUT
+            echo "⚠️ Tag $TAG exists, skipping"
           else
-            echo "exists=false" >> $GITHUB_OUTPUT
-            echo "✅ Tag $TAG does not exist, proceeding with release"
+            echo "should_release=true" >> $GITHUB_OUTPUT
+            echo "✅ Will release $TAG"
           fi
 
-      - name: Update Info.plist version
-        if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && steps.check_tag.outputs.exists == 'false'
+# ===========================================
+# JOB 2: TEST - Run tests (parallel)
+# ===========================================
+  test:
+    needs: setup
+    if: needs.setup.outputs.should_release == 'true'
+    runs-on: macos-15
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Cache for Tests
+        uses: actions/cache@v4
+        with:
+          path: |
+            ios-sdk/DerivedData-Tests
+            ios-sdk/SourcePackages
+            ~/Library/Caches/org.swift.swiftpm
+          key: ${{ runner.os }}-test-v1-${{ hashFiles('ios-sdk/src/AriseMobileSdk.xcodeproj/project.pbxproj') }}
+          restore-keys: |
+            ${{ runner.os }}-test-v1-
+
+      - name: Boot Simulator
         run: |
-          PLIST_PATH="ios-sdk/src/AriseMobileSdk/AriseMobileSdk-Info.plist"
-          NEW_VERSION="${{ steps.version.outputs.version }}"
-
-          # Update CFBundleShortVersionString
-          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $NEW_VERSION" "$PLIST_PATH"
-
-          echo "✅ Updated Info.plist to version $NEW_VERSION"
-
-          # Verify the change
-          CURRENT=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$PLIST_PATH")
-          echo "   Verified: $CURRENT"
-
-      # ===========================================
-      # BUILD AND TEST
-      # ===========================================
-
-      - name: Create and Boot iOS Simulator
-        if: github.event_name == 'pull_request' || ((github.event_name == 'push' || github.event_name == 'workflow_dispatch') && steps.check_tag.outputs.exists == 'false')
-        run: |
-          echo "📱 Setting up iOS Simulator..."
-
-          # Find available iPhone simulator
-          SIMULATOR_ID=$(xcrun simctl list devices available | grep "iPhone" | grep -v "unavailable" | head -1 | sed 's/.*(\([A-F0-9-]*\)).*/\1/')
-
-          if [ -z "$SIMULATOR_ID" ]; then
-            echo "Creating new iPhone simulator..."
-            LATEST_RUNTIME=$(xcrun simctl list runtimes | grep iOS | tail -1 | awk '{print $NF}')
-            SIMULATOR_ID=$(xcrun simctl create "iPhone 15 Pro" "iPhone 15 Pro" "$LATEST_RUNTIME")
-          fi
-
-          echo "Using simulator: $SIMULATOR_ID"
-
-          # Boot simulator
-          xcrun simctl boot "$SIMULATOR_ID" 2>/dev/null || echo "Simulator already booted or booting..."
-
-          # Wait for boot
-          for i in {1..30}; do
-            if xcrun simctl list devices | grep "$SIMULATOR_ID" | grep -q "Booted"; then
-              echo "✅ Simulator ready"
-              break
-            fi
-            sleep 2
-          done
+          SIMULATOR_ID=$(xcrun simctl list devices available | grep "iPhone" | head -1 | sed 's/.*(\([A-F0-9-]*\)).*/\1/')
+          xcrun simctl boot "$SIMULATOR_ID" 2>/dev/null || true
+          echo "✅ Simulator ready"
 
       - name: Run Tests
-        if: github.event_name == 'pull_request' || ((github.event_name == 'push' || github.event_name == 'workflow_dispatch') && steps.check_tag.outputs.exists == 'false')
         run: |
           cd ios-sdk/libs
-
-          if [ -f "build_and_test_ci.sh" ]; then
-            chmod +x build_and_test_ci.sh
-            ./build_and_test_ci.sh test
-          else
-            # Fallback: run tests directly
-            xcodebuild test \
-              -project ../src/AriseMobileSdk.xcodeproj \
-              -scheme AriseMobileSdkTests \
-              -destination 'platform=iOS Simulator,name=iPhone 15 Pro' \
-              -resultBundlePath ../test-results.xcresult \
-              | xcpretty || true
-          fi
+          chmod +x build_and_test_ci.sh
+          ./build_and_test_ci.sh test
 
       - name: Upload Test Results
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: test-results-${{ steps.release_type.outputs.type }}
-          path: |
-            ios-sdk/test-results.xcresult
-            test-results.xcresult
+          name: test-results
+          path: ios-sdk/test-results.xcresult
           retention-days: 30
           if-no-files-found: warn
 
-      # ===========================================
-      # BUILD FRAMEWORK
-      # ===========================================
+# ===========================================
+# JOB 3: BUILD - Build framework (parallel)
+# ===========================================
+  build:
+    needs: setup
+    if: needs.setup.outputs.should_release == 'true'
+    runs-on: macos-15
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Cache for Build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ios-sdk/libs/Build
+            ios-sdk/SourcePackages
+            ~/Library/Caches/org.swift.swiftpm
+          key: ${{ runner.os }}-build-v1-${{ hashFiles('ios-sdk/src/AriseMobileSdk.xcodeproj/project.pbxproj') }}
+          restore-keys: |
+            ${{ runner.os }}-build-v1-
+
+      - name: Update Info.plist version
+        run: |
+          PLIST_PATH="ios-sdk/src/AriseMobileSdk/AriseMobileSdk-Info.plist"
+          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString ${{ needs.setup.outputs.version }}" "$PLIST_PATH"
+          echo "✅ Version set to ${{ needs.setup.outputs.version }}"
 
       - name: Build XCFramework
-        if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && steps.check_tag.outputs.exists == 'false'
         run: |
           cd ios-sdk/libs
-
-          if [ -f "build_and_test_ci.sh" ]; then
-            chmod +x build_and_test_ci.sh
-            ./build_and_test_ci.sh build
-          elif [ -f "build_framework_ci.sh" ]; then
-            chmod +x build_framework_ci.sh
-            ./build_framework_ci.sh
-          else
-            chmod +x build_framework.sh
-            ./build_framework.sh
-          fi
-
+          chmod +x build_and_test_ci.sh
+          ./build_and_test_ci.sh build
           echo "✅ Framework built"
-          ls -lh AriseMobile.xcframework 2>/dev/null || ls -lh AriseMobileSdk.xcframework 2>/dev/null || echo "Framework location varies"
 
-      - name: Detect Module Name
-        if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && steps.check_tag.outputs.exists == 'false'
-        id: module_name
+      - name: Prepare Distribution
         run: |
-          # Get module name from project settings
-          MODULE_NAME=$(grep "PRODUCT_MODULE_NAME" ios-sdk/src/AriseMobileSdk.xcodeproj/project.pbxproj | head -1 | sed -E 's/.*PRODUCT_MODULE_NAME[[:space:]]*=[[:space:]]*([^;]+);.*/\1/' | xargs)
-
-          if [ -z "$MODULE_NAME" ]; then
-            MODULE_NAME="AriseMobile"
-          fi
-
-          echo "module_name=$MODULE_NAME" >> $GITHUB_OUTPUT
-          echo "✅ Module name: $MODULE_NAME"
-
-      - name: Copy frameworks to distribution package
-        if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && steps.check_tag.outputs.exists == 'false'
-        run: |
-          MODULE_NAME="${{ steps.module_name.outputs.module_name }}"
-
           mkdir -p ios-sdk/Distribution/libs
 
-          # Copy framework (handle both naming conventions)
-          if [ -d "ios-sdk/libs/${MODULE_NAME}.xcframework" ]; then
-            rm -rf "ios-sdk/Distribution/libs/${MODULE_NAME}.xcframework"
-            cp -R "ios-sdk/libs/${MODULE_NAME}.xcframework" ios-sdk/Distribution/libs/
-          elif [ -d "ios-sdk/libs/AriseMobileSdk.xcframework" ]; then
-            rm -rf ios-sdk/Distribution/libs/AriseMobileSdk.xcframework
-            cp -R ios-sdk/libs/AriseMobileSdk.xcframework ios-sdk/Distribution/libs/
+          # Copy AriseMobile framework
+          if [ -d "ios-sdk/libs/AriseMobile.xcframework" ]; then
+            cp -R ios-sdk/libs/AriseMobile.xcframework ios-sdk/Distribution/libs/
           fi
 
-          # Copy CloudCommerce if exists
+          # Copy CloudCommerce framework
           if [ -d "ios-sdk/libs/CloudCommerce.xcframework" ]; then
-            rm -rf ios-sdk/Distribution/libs/CloudCommerce.xcframework
             cp -R ios-sdk/libs/CloudCommerce.xcframework ios-sdk/Distribution/libs/
           fi
 
-          echo "✅ Frameworks copied"
+          echo "✅ Frameworks prepared"
           ls -lh ios-sdk/Distribution/libs/
 
-      - name: Create archive
-        if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && steps.check_tag.outputs.exists == 'false'
+      - name: Create Archive
         run: |
-          VERSION="${{ steps.version.outputs.version }}"
-          RELEASE_TYPE="${{ steps.release_type.outputs.type }}"
-
           cd ios-sdk/Distribution
+          VERSION="${{ needs.setup.outputs.version }}"
+          TYPE="${{ needs.setup.outputs.release_type }}"
 
-          if [[ "$RELEASE_TYPE" == "uat" ]]; then
-            ARCHIVE_NAME="AriseMobile-v${VERSION}-uat-xcframeworks.zip"
+          if [[ "$TYPE" == "uat" ]]; then
+            ARCHIVE="AriseMobile-v${VERSION}-uat-xcframeworks.zip"
           else
-            ARCHIVE_NAME="AriseMobile-v${VERSION}-xcframeworks.zip"
+            ARCHIVE="AriseMobile-v${VERSION}-xcframeworks.zip"
           fi
 
-          zip -r "$ARCHIVE_NAME" libs/
+          zip -r "$ARCHIVE" libs/
+          echo "archive_name=$ARCHIVE" >> $GITHUB_ENV
+          echo "✅ Archive: $ARCHIVE"
 
-          echo "archive_name=$ARCHIVE_NAME" >> $GITHUB_ENV
-          echo "✅ Archive created: $ARCHIVE_NAME"
-          ls -lh "$ARCHIVE_NAME"
-
-      - name: Upload artifact
-        if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && steps.check_tag.outputs.exists == 'false'
+      - name: Upload Build Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ios-sdk-xcframework-${{ steps.release_type.outputs.type }}
-          path: |
-            ios-sdk/Distribution/${{ env.archive_name }}
-            ios-sdk/Distribution/libs/
-          retention-days: 90
+          name: ios-sdk-build
+          path: ios-sdk/Distribution/
+          retention-days: 1
 
-      # ===========================================
-      # PUBLISH TO DISTRIBUTION REPO
-      # ===========================================
+# ===========================================
+# JOB 4: RELEASE - Publish (after test + build)
+# ===========================================
+  release:
+    needs: [setup, test, build]
+    if: needs.setup.outputs.should_release == 'true'
+    runs-on: macos-15
+    timeout-minutes: 15
 
-      - name: Setup distribution repository
-        if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && steps.check_tag.outputs.exists == 'false'
+    steps:
+      - name: Download Build Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ios-sdk-build
+          path: distribution-files/
+
+      - name: Setup Distribution Repository
         run: |
           REPO_URL="https://x-access-token:${{ secrets.DISTRIBUTION_REPO_TOKEN }}@github.com/${{ secrets.DISTRIBUTION_REPO }}.git"
 
-          mkdir -p distribution-repo
-          cd distribution-repo
-
-          if git clone --depth=1 "$REPO_URL" . 2>/dev/null; then
-            echo "✅ Repository cloned"
-            git fetch --unshallow 2>/dev/null || git fetch origin --tags
-            git checkout main || git checkout -b main
-          else
-            echo "⚠️  Repository is empty, initializing..."
+          git clone --depth=1 "$REPO_URL" distribution-repo 2>/dev/null || {
+            mkdir distribution-repo
+            cd distribution-repo
             git init
             git remote add origin "$REPO_URL"
             git checkout -b main
-          fi
+          }
 
-      - name: Configure git
-        if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && steps.check_tag.outputs.exists == 'false'
+          cd distribution-repo
+          git fetch origin --tags 2>/dev/null || true
+          git checkout main 2>/dev/null || git checkout -b main
+
+      - name: Configure Git
         working-directory: distribution-repo
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-      - name: Copy files to distribution repository
-        if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && steps.check_tag.outputs.exists == 'false'
+      - name: Copy Files
         run: |
-          # Copy Package.swift
-          cp ios-sdk/Distribution/Package.swift distribution-repo/
-          cp ios-sdk/Distribution/README.md distribution-repo/ 2>/dev/null || true
+          # Copy Package.swift and Sources
+          cp distribution-files/Package.swift distribution-repo/
+          cp distribution-files/README.md distribution-repo/ 2>/dev/null || true
 
-          # Copy Sources
-          mkdir -p distribution-repo/Sources/AriseMobileSdkIos
-          cp -R ios-sdk/Distribution/Sources/AriseMobileSdkIos/* distribution-repo/Sources/AriseMobileSdkIos/
+          mkdir -p distribution-repo/Sources
+          cp -R distribution-files/Sources/* distribution-repo/Sources/ 2>/dev/null || true
 
-          # Copy libs
+          # Copy frameworks
           mkdir -p distribution-repo/libs
           rm -rf distribution-repo/libs/*
-          cp -R ios-sdk/Distribution/libs/* distribution-repo/libs/
+          cp -R distribution-files/libs/* distribution-repo/libs/
 
-          echo "✅ Files copied to distribution repository"
+          echo "✅ Files copied"
 
-      - name: Commit and push
-        if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && steps.check_tag.outputs.exists == 'false'
+      - name: Commit and Push
         working-directory: distribution-repo
         run: |
-          VERSION="${{ steps.version.outputs.version }}"
-          RELEASE_TYPE="${{ steps.release_type.outputs.type }}"
-
           git add .
 
           if git diff --staged --quiet; then
-            echo "No changes to commit"
+            echo "No changes"
           else
-            if [[ "$RELEASE_TYPE" == "uat" ]]; then
+            TYPE="${{ needs.setup.outputs.release_type }}"
+            VERSION="${{ needs.setup.outputs.version }}"
+
+            if [[ "$TYPE" == "uat" ]]; then
               git commit -m "UAT release v${VERSION}"
             else
               git commit -m "Production release v${VERSION}"
             fi
             git push -u origin main
-            echo "✅ Changes pushed"
+            echo "✅ Pushed"
           fi
 
-      - name: Check if tag exists in distribution repo
-        if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && steps.check_tag.outputs.exists == 'false'
-        id: check_dist_tag
+      - name: Create Tag
         working-directory: distribution-repo
         run: |
-          TAG="${{ steps.version.outputs.tag }}"
+          TAG="${{ needs.setup.outputs.tag }}"
+          TYPE="${{ needs.setup.outputs.release_type }}"
 
-          if git rev-parse "$TAG" >/dev/null 2>&1; then
-            echo "exists=true" >> $GITHUB_OUTPUT
-            echo "⚠️  Tag $TAG already exists in distribution repo"
-          else
-            echo "exists=false" >> $GITHUB_OUTPUT
-            echo "✅ Tag $TAG does not exist"
-          fi
-
-      - name: Create git tag
-        if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && steps.check_tag.outputs.exists == 'false' && steps.check_dist_tag.outputs.exists == 'false'
-        working-directory: distribution-repo
-        run: |
-          TAG="${{ steps.version.outputs.tag }}"
-          RELEASE_TYPE="${{ steps.release_type.outputs.type }}"
-
-          if [[ "$RELEASE_TYPE" == "uat" ]]; then
+          if [[ "$TYPE" == "uat" ]]; then
             git tag -a "$TAG" -m "UAT Release $TAG"
           else
             git tag -a "$TAG" -m "Production Release $TAG"
           fi
 
           git push origin "$TAG"
-          echo "✅ Tag $TAG created and pushed"
+          echo "✅ Tag $TAG created"
+
+      - name: Find Archive
+        id: archive
+        run: |
+          ARCHIVE=$(ls distribution-files/*.zip 2>/dev/null | head -1)
+          echo "path=$ARCHIVE" >> $GITHUB_OUTPUT
+          echo "📦 Archive: $ARCHIVE"
 
       - name: Create GitHub Release
-        if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && steps.check_tag.outputs.exists == 'false' && steps.check_dist_tag.outputs.exists == 'false'
         uses: softprops/action-gh-release@v1
         with:
           repository: ${{ secrets.DISTRIBUTION_REPO }}
           token: ${{ secrets.DISTRIBUTION_REPO_TOKEN }}
-          tag_name: ${{ steps.version.outputs.tag }}
-          name: AriseMobileSdk ${{ steps.version.outputs.tag }}
-          prerelease: ${{ steps.release_type.outputs.prerelease }}
+          tag_name: ${{ needs.setup.outputs.tag }}
+          name: AriseMobileSdk ${{ needs.setup.outputs.tag }}
+          prerelease: ${{ needs.setup.outputs.prerelease }}
           body: |
-            ## 🚀 AriseMobileSdk ${{ steps.version.outputs.tag }}
+            ## AriseMobileSdk ${{ needs.setup.outputs.tag }}
 
-            ### 📦 Release Type
+            **Type:** ${{ needs.setup.outputs.release_type == 'uat' && '🧪 UAT' || '✅ Production' }}
 
-            ${{ steps.release_type.outputs.type == 'uat' && '🧪 **UAT Release** - For testing purposes' || '✅ **Production Release** - Stable version' }}
-
-            ### 📋 Technical Details
-
-            - **Version:** `${{ steps.version.outputs.version }}`
-            - **Minimum iOS:** 15.0
-            - **Minimum Xcode:** 15.0
-            - **Minimum Swift:** 5.9
-
-            ### 📥 Installation
+            ### Installation
 
             ```swift
-            dependencies: [
-                .package(
-                    url: "https://github.com/${{ secrets.DISTRIBUTION_REPO }}.git",
-                    ${{ steps.release_type.outputs.type == 'uat' && format('exact: "{0}"', steps.version.outputs.version) || format('from: "{0}"', steps.version.outputs.version) }}
-                )
-            ]
+            .package(url: "https://github.com/${{ secrets.DISTRIBUTION_REPO }}.git", ${{ needs.setup.outputs.release_type == 'uat' && format('exact: "{0}-uat"', needs.setup.outputs.version) || format('from: "{0}"', needs.setup.outputs.version) }})
             ```
-
-            ${{ steps.release_type.outputs.type == 'uat' && '> ⚠️ **Note:** UAT releases use `exact:` version pinning to prevent automatic updates.' || '' }}
-          files: |
-            ios-sdk/Distribution/${{ env.archive_name }}
+          files: ${{ steps.archive.outputs.path }}
           draft: false
 
-      # ===========================================
-      # SUMMARY
-      # ===========================================
-
       - name: Summary
-        if: always()
         run: |
-          echo "## 📊 Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "## ✅ Release Complete" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-
-          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            echo "### 🔍 Pull Request Build" >> $GITHUB_STEP_SUMMARY
-            echo "- Tests executed for validation" >> $GITHUB_STEP_SUMMARY
-            echo "- No release created (PR only)" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "### 🚀 Release Build" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "| Property | Value |" >> $GITHUB_STEP_SUMMARY
-            echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
-            echo "| **Type** | \`${{ steps.release_type.outputs.type }}\` |" >> $GITHUB_STEP_SUMMARY
-            echo "| **Version** | \`${{ steps.version.outputs.version }}\` |" >> $GITHUB_STEP_SUMMARY
-            echo "| **Tag** | \`${{ steps.version.outputs.tag }}\` |" >> $GITHUB_STEP_SUMMARY
-            echo "| **Pre-release** | \`${{ steps.release_type.outputs.prerelease }}\` |" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-
-            if [[ "${{ steps.check_tag.outputs.exists }}" == "true" ]]; then
-              echo "### ⚠️ Release Skipped" >> $GITHUB_STEP_SUMMARY
-              echo "Tag already exists. Use \`force_release\` to override." >> $GITHUB_STEP_SUMMARY
-            else
-              echo "### ✅ Release Created" >> $GITHUB_STEP_SUMMARY
-              echo "" >> $GITHUB_STEP_SUMMARY
-              echo "**Installation:**" >> $GITHUB_STEP_SUMMARY
-              echo "\`\`\`swift" >> $GITHUB_STEP_SUMMARY
-              echo ".package(url: \"https://github.com/${{ secrets.DISTRIBUTION_REPO }}.git\", ${{ steps.release_type.outputs.type == 'uat' && format('exact: \"{0}\"', steps.version.outputs.version) || format('from: \"{0}\"', steps.version.outputs.version) }})" >> $GITHUB_STEP_SUMMARY
-              echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-            fi
-          fi
+          echo "| Property | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Type | ${{ needs.setup.outputs.release_type }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Version | ${{ needs.setup.outputs.version }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Tag | ${{ needs.setup.outputs.tag }} |" >> $GITHUB_STEP_SUMMARY
