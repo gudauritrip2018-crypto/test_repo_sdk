@@ -30,6 +30,7 @@ jobs:
       release_type: ${{ steps.release_type.outputs.type }}
       prerelease: ${{ steps.release_type.outputs.prerelease }}
       should_release: ${{ steps.check_tag.outputs.should_release }}
+      changelog: ${{ steps.changelog.outputs.changelog }}
 
     steps:
       - name: Checkout
@@ -216,6 +217,48 @@ jobs:
             echo "should_release=true" >> $GITHUB_OUTPUT
             echo "✅ Tag $TAG does not exist, proceeding with release"
           fi
+
+      - name: Generate changelog
+        id: changelog
+        env:
+          DIST_REPO_TOKEN: ${{ secrets.DISTRIBUTION_REPO_TOKEN }}
+          DIST_REPO: ${{ secrets.DISTRIBUTION_REPO }}
+        run: |
+          echo "📝 Generating changelog..."
+
+          RELEASE_TYPE="${{ steps.release_type.outputs.type }}"
+          REPO_URL="https://x-access-token:${DIST_REPO_TOKEN}@github.com/${DIST_REPO}.git"
+
+          PREV_TAG=""
+          if git clone --bare --filter=blob:none "$REPO_URL" dist-repo-changelog 2>/dev/null; then
+            cd dist-repo-changelog
+            if [[ "$RELEASE_TYPE" == "uat" ]]; then
+              PREV_TAG=$(git tag -l "v*-uat" | sort -V | tail -1)
+            else
+              PREV_TAG=$(git tag -l "v*" | grep -v "\-uat" | sort -V | tail -1)
+            fi
+            cd ..
+            rm -rf dist-repo-changelog
+          fi
+
+          echo "📌 Previous tag: ${PREV_TAG:-none}"
+
+          if [ -n "$PREV_TAG" ]; then
+            CHANGELOG=$(git log --pretty=format:"- %s (%h)" --no-merges -- ios-sdk/ | head -20)
+          else
+            CHANGELOG=$(git log --pretty=format:"- %s (%h)" --no-merges -- ios-sdk/ | head -20)
+          fi
+
+          if [ -z "$CHANGELOG" ]; then
+            CHANGELOG="- Initial release"
+          fi
+
+          echo "📋 Changelog:"
+          echo "$CHANGELOG"
+
+          echo "changelog<<EOF" >> $GITHUB_OUTPUT
+          echo "$CHANGELOG" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
 
 # ===========================================
 # JOB 2: TEST - Run tests (parallel with build)
@@ -457,7 +500,11 @@ jobs:
           body: |
             ## AriseMobileSdk ${{ needs.setup.outputs.tag }}
 
-            **Type:** ${{ needs.setup.outputs.release_type == 'uat' && '🧪 UAT' || '✅ Production' }}
+            **Type:** ${{ needs.setup.outputs.release_type == 'uat' && 'UAT (Pre-release)' || 'Production' }}
+
+            ### Changes
+
+            ${{ needs.setup.outputs.changelog }}
 
             ### Installation
 
