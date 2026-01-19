@@ -108,6 +108,13 @@ jobs:
           echo "UAT tags: ${UAT_TAGS:-none}"
           echo ""
 
+          # Read version from Info.plist
+          PLIST_VERSION=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" ios-sdk/src/AriseMobileSdk/AriseMobileSdk-Info.plist 2>/dev/null || echo "1.0.0")
+          PLIST_MAJOR=$(echo $PLIST_VERSION | cut -d. -f1)
+          PLIST_MINOR=$(echo $PLIST_VERSION | cut -d. -f2)
+          PLIST_PATCH=$(echo $PLIST_VERSION | cut -d. -f3)
+          echo "📄 Info.plist version: $PLIST_VERSION (MAJOR=$PLIST_MAJOR)"
+
           # Find the HIGHEST version across ALL tags (production and UAT)
           # This determines our current version baseline
           HIGHEST_TAG=$(echo "$ALL_TAGS" | sed 's/-uat$//' | sort -V | tail -1)
@@ -117,10 +124,22 @@ jobs:
             echo "⚠️ No tags found, using default: $HIGHEST_TAG"
           fi
 
-          echo "📌 Highest version found: $HIGHEST_TAG"
+          echo "📌 Highest version from tags: $HIGHEST_TAG"
 
           VERSION=${HIGHEST_TAG#v}
-          MAJOR=$(echo $VERSION | cut -d. -f1)
+          TAG_MAJOR=$(echo $VERSION | cut -d. -f1)
+
+          # Check if Info.plist has a higher major version
+          if [ "$PLIST_MAJOR" -gt "$TAG_MAJOR" ]; then
+            echo ""
+            echo "🚀 Info.plist major version ($PLIST_MAJOR) > tags major version ($TAG_MAJOR)"
+            echo "   Using Info.plist version as new baseline: $PLIST_VERSION"
+            VERSION="$PLIST_VERSION"
+            MAJOR="$PLIST_MAJOR"
+          else
+            echo "📌 Using tags version as baseline (plist major $PLIST_MAJOR <= tags major $TAG_MAJOR)"
+            MAJOR=$TAG_MAJOR
+          fi
           MINOR=$(echo $VERSION | cut -d. -f2)
           PATCH=$(echo $VERSION | cut -d. -f3)
           echo "📐 Parsed: MAJOR=$MAJOR, MINOR=$MINOR, PATCH=$PATCH"
