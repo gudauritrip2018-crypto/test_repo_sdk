@@ -1,25 +1,15 @@
-name: iOS SDK CI (UAT/Production)
+name: iOS SDK CI
 
 on:
   push:
     branches:
       - main
-      - release
     paths:
       - 'ios-sdk/**'
       - '.github/workflows/ios-sdk-ci-v2.yml'
 
   workflow_dispatch:
-    inputs:
-      force_release:
-        description: 'Force release even if tag exists'
-        required: false
-        type: boolean
-        default: false
 
-# ===========================================
-# JOB 1: SETUP - Determine version and release type
-# ===========================================
 jobs:
   setup:
     runs-on: macos-15
@@ -27,9 +17,6 @@ jobs:
     outputs:
       version: ${{ steps.version.outputs.version }}
       tag: ${{ steps.version.outputs.tag }}
-      release_type: ${{ steps.release_type.outputs.type }}
-      prerelease: ${{ steps.release_type.outputs.prerelease }}
-      should_release: ${{ steps.check_tag.outputs.should_release }}
       changelog: ${{ steps.changelog.outputs.changelog }}
 
     steps:
@@ -38,185 +25,61 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Determine release type
-        id: release_type
-        run: |
-          BRANCH="${{ github.ref_name }}"
-          if [[ "$BRANCH" == "release" ]]; then
-            echo "type=production" >> $GITHUB_OUTPUT
-            echo "prerelease=false" >> $GITHUB_OUTPUT
-            echo "🚀 Release type: PRODUCTION"
-          else
-            echo "type=uat" >> $GITHUB_OUTPUT
-            echo "prerelease=true" >> $GITHUB_OUTPUT
-            echo "🧪 Release type: UAT"
-          fi
-
-      - name: Calculate next version
+      - name: Calculate version
         id: version
         env:
           DIST_REPO_TOKEN: ${{ secrets.DISTRIBUTION_REPO_TOKEN }}
           DIST_REPO: ${{ secrets.DISTRIBUTION_REPO }}
         run: |
-          echo "📥 Fetching tags from distribution repository..."
+          echo "Fetching tags from distribution repository..."
 
-          # Debug: show repo info
-          echo "═══════════════════════════════════════"
-          echo "🔗 Distribution repo: ${DIST_REPO}"
-          echo "🔗 Token length: ${#DIST_REPO_TOKEN} chars"
-          echo "═══════════════════════════════════════"
-          echo ""
-
-          # Clone the distribution repo to get tags
-          echo "📦 Cloning distribution repo..."
           REPO_URL="https://x-access-token:${DIST_REPO_TOKEN}@github.com/${DIST_REPO}.git"
 
-          if git clone --bare --filter=blob:none "$REPO_URL" dist-repo-tags 2>&1; then
-            echo "✅ Clone successful"
+          LAST_TAG=""
+          if git clone --bare --filter=blob:none "$REPO_URL" dist-repo-tags 2>/dev/null; then
             cd dist-repo-tags
-            RAW_OUTPUT=$(git tag -l 'v*' 2>&1) || true
+            LAST_TAG=$(git tag -l "v*-pre-release-*" | sort -V | tail -1)
             cd ..
             rm -rf dist-repo-tags
-          else
-            echo "❌ Clone failed, trying ls-remote..."
-            RAW_OUTPUT=$(git ls-remote --tags "$REPO_URL" 2>&1) || true
           fi
 
-          echo ""
-          echo "Raw tags output:"
-          echo "═══════════════════════════════════════"
-          echo "$RAW_OUTPUT" | head -30
-          echo ""
+          echo "Last pre-release tag: ${LAST_TAG:-none}"
 
-          # Fetch ALL tags (both production and UAT)
-          ALL_TAGS=$(echo "$RAW_OUTPUT" | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+(-uat)?' | sort -Vu || echo "")
-
-          echo "═══════════════════════════════════════"
-          echo "📋 All extracted tags:"
-          echo "═══════════════════════════════════════"
-          if [ -n "$ALL_TAGS" ]; then
-            echo "$ALL_TAGS"
-          else
-            echo "(no tags found - check DISTRIBUTION_REPO_TOKEN and DISTRIBUTION_REPO secrets)"
-          fi
-          echo ""
-
-          # Separate production and UAT tags
-          PROD_TAGS=$(echo "$ALL_TAGS" | grep -v '\-uat' || echo "")
-          UAT_TAGS=$(echo "$ALL_TAGS" | grep '\-uat' || echo "")
-
-          echo "Production tags: ${PROD_TAGS:-none}"
-          echo "UAT tags: ${UAT_TAGS:-none}"
-          echo ""
-
-          # Read version from Info.plist
           PLIST_VERSION=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" ios-sdk/src/AriseMobileSdk/AriseMobileSdk-Info.plist 2>/dev/null || echo "1.0.0")
           PLIST_MAJOR=$(echo $PLIST_VERSION | cut -d. -f1)
-          PLIST_MINOR=$(echo $PLIST_VERSION | cut -d. -f2)
-          PLIST_PATCH=$(echo $PLIST_VERSION | cut -d. -f3)
-          echo "📄 Info.plist version: $PLIST_VERSION (MAJOR=$PLIST_MAJOR)"
+          echo "Info.plist version: $PLIST_VERSION (major: $PLIST_MAJOR)"
 
-          # Find the HIGHEST version across ALL tags (production and UAT)
-          # This determines our current version baseline
-          HIGHEST_TAG=$(echo "$ALL_TAGS" | sed 's/-uat$//' | sort -V | tail -1)
+          if [ -n "$LAST_TAG" ]; then
+            TAG_VERSION=$(echo "$LAST_TAG" | sed 's/^v//' | sed 's/-pre-release-.*//')
+            TAG_MAJOR=$(echo "$TAG_VERSION" | cut -d. -f1)
+            TAG_BUILD=$(echo "$LAST_TAG" | sed 's/.*-pre-release-//')
 
-          if [ -z "$HIGHEST_TAG" ]; then
-            HIGHEST_TAG="v1.0.0"
-            echo "⚠️ No tags found, using default: $HIGHEST_TAG"
-          fi
+            echo "Tag version: $TAG_VERSION (major: $TAG_MAJOR, build: $TAG_BUILD)"
 
-          echo "📌 Highest version from tags: $HIGHEST_TAG"
-
-          VERSION=${HIGHEST_TAG#v}
-          TAG_MAJOR=$(echo $VERSION | cut -d. -f1)
-
-          # Check if Info.plist has a higher major version
-          if [ "$PLIST_MAJOR" -gt "$TAG_MAJOR" ]; then
-            echo ""
-            echo "🚀 Info.plist major version ($PLIST_MAJOR) > tags major version ($TAG_MAJOR)"
-            echo "   Using Info.plist version as new baseline: $PLIST_VERSION"
-            VERSION="$PLIST_VERSION"
-            MAJOR="$PLIST_MAJOR"
-          else
-            echo "📌 Using tags version as baseline (plist major $PLIST_MAJOR <= tags major $TAG_MAJOR)"
-            MAJOR=$TAG_MAJOR
-          fi
-          MINOR=$(echo $VERSION | cut -d. -f2)
-          PATCH=$(echo $VERSION | cut -d. -f3)
-          echo "📐 Parsed: MAJOR=$MAJOR, MINOR=$MINOR, PATCH=$PATCH"
-
-          RELEASE_TYPE="${{ steps.release_type.outputs.type }}"
-
-          if [[ "$RELEASE_TYPE" == "production" ]]; then
-            # Production: increment minor, reset patch
-            NEW_MINOR=$((MINOR + 1))
-            NEW_VERSION="${MAJOR}.${NEW_MINOR}.0"
-            TAG="v${NEW_VERSION}"
-            echo ""
-            echo "📦 Production release: $TAG"
-          else
-            # UAT: find highest UAT for this major.minor and increment patch
-            UAT_PATTERN="^v${MAJOR}\.${MINOR}\.[0-9]+-uat$"
-            echo ""
-            echo "🔍 Looking for UAT tags matching: v${MAJOR}.${MINOR}.*-uat"
-
-            MATCHING_UAT=$(echo "$ALL_TAGS" | grep -E "$UAT_PATTERN" || echo "")
-            if [ -n "$MATCHING_UAT" ]; then
-              echo "   Found matching UAT tags:"
-              echo "$MATCHING_UAT" | sed 's/^/   - /'
-              LAST_UAT_TAG=$(echo "$MATCHING_UAT" | sort -V | tail -1)
+            if [ "$PLIST_MAJOR" -gt "$TAG_MAJOR" ]; then
+              echo "Info.plist major ($PLIST_MAJOR) > tag major ($TAG_MAJOR), using plist version"
+              BASE_VERSION="$PLIST_VERSION"
+              BUILD_NUMBER=1
             else
-              echo "   No UAT tags found for v${MAJOR}.${MINOR}.x"
-              LAST_UAT_TAG=""
+              BASE_VERSION="$TAG_VERSION"
+              BUILD_NUMBER=$((TAG_BUILD + 1))
             fi
-
-            if [ -z "$LAST_UAT_TAG" ]; then
-              # No UAT for this version - start at patch+1 or 1
-              NEW_PATCH=$((PATCH + 1))
-              echo "   Starting new UAT series at patch $NEW_PATCH"
-            else
-              UAT_PATCH=$(echo ${LAST_UAT_TAG#v} | cut -d. -f3 | cut -d- -f1)
-              NEW_PATCH=$((UAT_PATCH + 1))
-              echo "   Last UAT: $LAST_UAT_TAG, incrementing to patch $NEW_PATCH"
-            fi
-
-            NEW_VERSION="${MAJOR}.${MINOR}.${NEW_PATCH}"
-            TAG="v${NEW_VERSION}-uat"
-            echo ""
-            echo "🧪 UAT release: $TAG"
+          else
+            echo "No previous tags found, using plist version"
+            BASE_VERSION="$PLIST_VERSION"
+            BUILD_NUMBER=1
           fi
 
-          echo ""
-          echo "═══════════════════════════════════════"
-          echo "📦 FINAL VERSION: $NEW_VERSION"
-          echo "🏷️  FINAL TAG: $TAG"
-          echo "═══════════════════════════════════════"
+          VERSION="${BASE_VERSION}-pre-release-${BUILD_NUMBER}"
+          TAG="v${VERSION}"
 
-          echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "Base version: $BASE_VERSION"
+          echo "Build number: $BUILD_NUMBER"
+          echo "Final version: $VERSION"
+          echo "Tag: $TAG"
+
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "tag=$TAG" >> $GITHUB_OUTPUT
-
-      - name: Check if tag exists
-        id: check_tag
-        env:
-          DIST_REPO_TOKEN: ${{ secrets.DISTRIBUTION_REPO_TOKEN }}
-          DIST_REPO: ${{ secrets.DISTRIBUTION_REPO }}
-        run: |
-          TAG="${{ steps.version.outputs.tag }}"
-          FORCE="${{ inputs.force_release }}"
-
-          echo "🔍 Checking if tag $TAG exists in distribution repo..."
-          REPO_URL="https://x-access-token:${DIST_REPO_TOKEN}@github.com/${DIST_REPO}.git"
-          TAG_CHECK=$(git ls-remote --tags "$REPO_URL" "refs/tags/${TAG}" 2>/dev/null || echo "")
-
-          echo "   Result: ${TAG_CHECK:-empty}"
-
-          if [ -n "$TAG_CHECK" ] && [ "$FORCE" != "true" ]; then
-            echo "should_release=false" >> $GITHUB_OUTPUT
-            echo "⚠️ Tag $TAG already exists, skipping release"
-          else
-            echo "should_release=true" >> $GITHUB_OUTPUT
-            echo "✅ Tag $TAG does not exist, proceeding with release"
-          fi
 
       - name: Generate changelog
         id: changelog
@@ -226,7 +89,6 @@ jobs:
         run: |
           echo "Generating changelog..."
 
-          RELEASE_TYPE="${{ steps.release_type.outputs.type }}"
           REPO_URL="https://x-access-token:${DIST_REPO_TOKEN}@github.com/${DIST_REPO}.git"
 
           PREV_TAG=""
@@ -234,11 +96,7 @@ jobs:
 
           if git clone --bare --filter=blob:none "$REPO_URL" dist-repo-changelog 2>/dev/null; then
             cd dist-repo-changelog
-            if [[ "$RELEASE_TYPE" == "uat" ]]; then
-              PREV_TAG=$(git tag -l "v*-uat" | sort -V | tail -1)
-            else
-              PREV_TAG=$(git tag -l "v*" | grep -v "\-uat" | sort -V | tail -1)
-            fi
+            PREV_TAG=$(git tag -l "v*-pre-release-*" | sort -V | tail -1)
 
             if [ -n "$PREV_TAG" ]; then
               PREV_TAG_DATE=$(git log -1 --format="%ci" "$PREV_TAG" 2>/dev/null || echo "")
@@ -269,12 +127,8 @@ jobs:
           echo "$CHANGELOG" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
-# ===========================================
-# JOB 2: TEST - Run tests (parallel with build)
-# ===========================================
   test:
     needs: setup
-    if: needs.setup.outputs.should_release == 'true'
     runs-on: macos-15
     timeout-minutes: 60
 
@@ -302,7 +156,7 @@ jobs:
         run: |
           SIMULATOR_ID=$(xcrun simctl list devices available | grep "iPhone" | head -1 | sed 's/.*(\([A-F0-9-]*\)).*/\1/')
           xcrun simctl boot "$SIMULATOR_ID" 2>/dev/null || true
-          echo "✅ Simulator ready"
+          echo "Simulator ready"
 
       - name: Run Tests
         run: |
@@ -319,12 +173,8 @@ jobs:
           retention-days: 30
           if-no-files-found: warn
 
-# ===========================================
-# JOB 3: BUILD - Build framework (parallel with test)
-# ===========================================
   build:
     needs: setup
-    if: needs.setup.outputs.should_release == 'true'
     runs-on: macos-15
     timeout-minutes: 30
 
@@ -355,9 +205,9 @@ jobs:
         run: |
           cd ios-sdk/libs
           chmod +x build_and_test_ci.sh
-          echo "🔧 Building with version: ${MARKETING_VERSION} (build ${BUILD_NUMBER})"
+          echo "Building with version: ${MARKETING_VERSION} (build ${BUILD_NUMBER})"
           ./build_and_test_ci.sh build
-          echo "✅ Framework built"
+          echo "Framework built"
 
       - name: Prepare Distribution
         run: |
@@ -371,23 +221,16 @@ jobs:
             cp -R ios-sdk/libs/CloudCommerce.xcframework ios-sdk/Distribution/libs/
           fi
 
-          echo "✅ Frameworks prepared"
+          echo "Frameworks prepared"
           ls -lh ios-sdk/Distribution/libs/
 
       - name: Create Archive
         run: |
           cd ios-sdk/Distribution
           VERSION="${{ needs.setup.outputs.version }}"
-          TYPE="${{ needs.setup.outputs.release_type }}"
-
-          if [[ "$TYPE" == "uat" ]]; then
-            ARCHIVE="AriseMobile-v${VERSION}-uat-xcframeworks.zip"
-          else
-            ARCHIVE="AriseMobile-v${VERSION}-xcframeworks.zip"
-          fi
-
+          ARCHIVE="AriseMobileSdk-v${VERSION}-xcframeworks.zip"
           zip -r "$ARCHIVE" libs/
-          echo "✅ Archive: $ARCHIVE"
+          echo "Archive: $ARCHIVE"
 
       - name: Upload Build Artifact
         uses: actions/upload-artifact@v4
@@ -396,12 +239,8 @@ jobs:
           path: ios-sdk/Distribution/
           retention-days: 1
 
-# ===========================================
-# JOB 4: RELEASE - Publish (after test + build)
-# ===========================================
   release:
     needs: [setup, test, build]
-    if: needs.setup.outputs.should_release == 'true'
     runs-on: macos-15
     timeout-minutes: 15
 
@@ -446,7 +285,7 @@ jobs:
           rm -rf distribution-repo/libs/*
           cp -R distribution-files/libs/* distribution-repo/libs/
 
-          echo "✅ Files copied"
+          echo "Files copied"
 
       - name: Commit and Push
         working-directory: distribution-repo
@@ -456,39 +295,27 @@ jobs:
           if git diff --staged --quiet; then
             echo "No changes"
           else
-            TYPE="${{ needs.setup.outputs.release_type }}"
             VERSION="${{ needs.setup.outputs.version }}"
-
-            if [[ "$TYPE" == "uat" ]]; then
-              git commit -m "UAT release v${VERSION}"
-            else
-              git commit -m "Production release v${VERSION}"
-            fi
+            git commit -m "Pre-release v${VERSION}"
             git push -u origin main
-            echo "✅ Pushed"
+            echo "Pushed"
           fi
 
       - name: Create Tag
         working-directory: distribution-repo
         run: |
           TAG="${{ needs.setup.outputs.tag }}"
-          TYPE="${{ needs.setup.outputs.release_type }}"
 
           if git rev-parse "$TAG" >/dev/null 2>&1; then
             git tag -d "$TAG"
           fi
 
           if git ls-remote --tags origin "refs/tags/${TAG}" | grep -q .; then
-            echo "⚠️ Tag $TAG already exists remotely, skipping"
+            echo "Tag $TAG already exists remotely, skipping"
           else
-            if [[ "$TYPE" == "uat" ]]; then
-              git tag -a "$TAG" -m "UAT Release $TAG"
-            else
-              git tag -a "$TAG" -m "Production Release $TAG"
-            fi
-
+            git tag -a "$TAG" -m "Pre-release $TAG"
             git push origin "$TAG"
-            echo "✅ Tag $TAG created"
+            echo "Tag $TAG created"
           fi
 
       - name: Find Archive
@@ -496,7 +323,7 @@ jobs:
         run: |
           ARCHIVE=$(ls distribution-files/*.zip 2>/dev/null | head -1)
           echo "path=$ARCHIVE" >> $GITHUB_OUTPUT
-          echo "📦 Archive: $ARCHIVE"
+          echo "Archive: $ARCHIVE"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
@@ -505,11 +332,11 @@ jobs:
           token: ${{ secrets.DISTRIBUTION_REPO_TOKEN }}
           tag_name: ${{ needs.setup.outputs.tag }}
           name: AriseMobileSdk ${{ needs.setup.outputs.tag }}
-          prerelease: ${{ needs.setup.outputs.prerelease }}
+          prerelease: true
           body: |
             ## AriseMobileSdk ${{ needs.setup.outputs.tag }}
 
-            **Type:** ${{ needs.setup.outputs.release_type == 'uat' && 'UAT (Pre-release)' || 'Production' }}
+            **Type:** Pre-release
 
             ### Changes
 
@@ -518,17 +345,44 @@ jobs:
             ### Installation
 
             ```swift
-            .package(url: "https://github.com/${{ secrets.DISTRIBUTION_REPO }}.git", ${{ needs.setup.outputs.release_type == 'uat' && format('exact: "{0}-uat"', needs.setup.outputs.version) || format('from: "{0}"', needs.setup.outputs.version) }})
+            .package(url: "https://github.com/${{ secrets.DISTRIBUTION_REPO }}.git", exact: "${{ needs.setup.outputs.version }}")
             ```
           files: ${{ steps.archive.outputs.path }}
           draft: false
 
+      - name: Cleanup Old Pre-releases
+        env:
+          GH_TOKEN: ${{ secrets.DISTRIBUTION_REPO_TOKEN }}
+        run: |
+          echo "Cleaning up old pre-releases (keeping last 5)..."
+
+          RELEASES=$(gh release list --repo "${{ secrets.DISTRIBUTION_REPO }}" --limit 100 --json tagName,isPrerelease | jq -r '.[] | select(.isPrerelease == true) | .tagName' | grep "pre-release" | sort -V)
+
+          COUNT=$(echo "$RELEASES" | grep -c . || echo "0")
+          echo "Found $COUNT pre-releases"
+
+          if [ "$COUNT" -gt 5 ]; then
+            DELETE_COUNT=$((COUNT - 5))
+            echo "Deleting $DELETE_COUNT old pre-releases..."
+
+            TO_DELETE=$(echo "$RELEASES" | head -n $DELETE_COUNT)
+
+            for TAG in $TO_DELETE; do
+              echo "Deleting release and tag: $TAG"
+              gh release delete "$TAG" --repo "${{ secrets.DISTRIBUTION_REPO }}" --yes 2>/dev/null || true
+              gh api --method DELETE "/repos/${{ secrets.DISTRIBUTION_REPO }}/git/refs/tags/$TAG" 2>/dev/null || true
+            done
+
+            echo "Cleanup complete"
+          else
+            echo "No cleanup needed"
+          fi
+
       - name: Summary
         run: |
-          echo "## ✅ Release Complete" >> $GITHUB_STEP_SUMMARY
+          echo "## Release Complete" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Property | Value |" >> $GITHUB_STEP_SUMMARY
           echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
-          echo "| Type | ${{ needs.setup.outputs.release_type }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Version | ${{ needs.setup.outputs.version }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Tag | ${{ needs.setup.outputs.tag }} |" >> $GITHUB_STEP_SUMMARY
