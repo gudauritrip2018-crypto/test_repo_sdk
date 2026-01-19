@@ -1,500 +1,320 @@
 name: Deploy iOS SDK Release
 
 on:
+  push:
+    branches:
+      - 'release/*'
+    paths:
+      - 'ios-sdk/**'
+      - '.github/workflows/deploy-release.yml'
+
   workflow_dispatch:
     inputs:
-      version:
-        description: 'Release version (e.g., 1.0.3)'
-        required: true
-        type: string
       release_notes:
-        description: 'Release notes (leave empty for auto-generation from git log)'
+        description: 'Release notes (markdown supported)'
         required: false
         type: string
-      artifact_source:
-        description: 'Where to get artifact from'
-        required: true
-        type: choice
-        options:
-          - 'build_workflow'
-          - 'github_release'
-          - 'upload_manually'
-        default: 'build_workflow'
-      build_run_id:
-        description: 'Build workflow run ID (if artifact_source is build_workflow). Leave empty to use latest successful run.'
-        required: false
-        type: string
-      skip_distribution_repo:
-        description: 'Skip updating distribution repository (only create GitHub Release)'
+      run_tests:
+        description: 'Run tests before release'
         required: false
         type: boolean
         default: false
 
 jobs:
-  deploy:
-    runs-on: macos-26
-    timeout-minutes: 60
-    
+  setup:
+    runs-on: macos-15
+    timeout-minutes: 10
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+      changelog: ${{ steps.changelog.outputs.changelog }}
+
     steps:
-      - name: Validate version format
-        run: |
-          VERSION="${{ inputs.version }}"
-          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "❌ Error: Invalid version format. Expected format: X.Y.Z (e.g., 1.0.3)"
-            exit 1
-          fi
-          echo "✅ Version format is valid: $VERSION"
-      
-      - name: Checkout code
+      - name: Checkout
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Need full history for release notes generation
-
-      - name: Find latest build workflow run
-        if: inputs.artifact_source == 'build_workflow' && inputs.build_run_id == ''
-        id: find_build_run
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const { data: runs } = await github.rest.actions.listWorkflowRuns({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              workflow_id: 'ios-sdk-ci.yml',
-              status: 'success',
-              per_page: 1
-            });
-            
-            if (runs.workflow_runs.length === 0) {
-              core.setFailed('No successful build workflow runs found');
-              return;
-            }
-            
-            const runId = runs.workflow_runs[0].id;
-            console.log(`Found latest successful run: ${runId}`);
-            core.setOutput('run_id', runId);
-
-      - name: Download artifact from build workflow
-        if: inputs.artifact_source == 'build_workflow'
-        uses: actions/download-artifact@v4
-        with:
-          name: ios-sdk-xcframework
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          run-id: ${{ inputs.build_run_id != '' && inputs.build_run_id || steps.find_build_run.outputs.run_id }}
-          path: ./artifacts
-
-      - name: Download artifact from GitHub Release
-        if: inputs.artifact_source == 'github_release'
-        run: |
-          # Install gh CLI if not available
-          if ! command -v gh &> /dev/null; then
-            echo "Installing gh CLI..."
-            brew install gh || echo "gh CLI installation failed, trying alternative method"
-          fi
-          
-          # Authenticate
-          echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
-          
-          # Download release assets
-          TAG="v${{ inputs.version }}"
-          echo "Downloading artifacts from release $TAG..."
-          
-          mkdir -p ./artifacts
-          
-          # Try distribution repo first
-          if [ -n "${{ secrets.DISTRIBUTION_REPO }}" ]; then
-            echo "Trying to download from distribution repository: ${{ secrets.DISTRIBUTION_REPO }}"
-            gh release download "$TAG" \
-              --repo ${{ secrets.DISTRIBUTION_REPO }} \
-              --pattern "*.zip" \
-              --dir ./artifacts || {
-                echo "Failed to download from distribution repo, trying current repo..."
-                # Try downloading from current repo if distribution repo doesn't have it
-                gh release download "$TAG" \
-                  --pattern "*.zip" \
-                  --dir ./artifacts || {
-                    echo "❌ Failed to download from both repositories"
-                    exit 1
-                  }
-              }
-          else
-            # Try current repo
-            echo "Downloading from current repository..."
-            gh release download "$TAG" \
-              --pattern "*.zip" \
-              --dir ./artifacts || {
-                echo "❌ Failed to download release artifacts"
-                exit 1
-              }
-          fi
-          
-          echo "✅ Artifacts downloaded:"
-          ls -lh ./artifacts/
-      
-      - name: Wait for manual artifact upload
-        if: inputs.artifact_source == 'upload_manually'
-        run: |
-          echo "⏳ Waiting for manual artifact upload..."
-          echo "Please upload the artifact to ./artifacts/ directory"
-          echo "Expected files:"
-          echo "  - AriseMobile-v${{ inputs.version }}-xcframeworks.zip"
-          echo "  - Or extracted libs/ directory with AriseMobile.xcframework"
-          echo ""
-          echo "Press Enter after uploading artifacts, or wait 60 seconds for timeout..."
-          
-          # Wait for artifacts to appear
-          timeout=60
-          elapsed=0
-          while [ $elapsed -lt $timeout ]; do
-            if [ -d "./artifacts" ] && [ -n "$(ls -A ./artifacts 2>/dev/null)" ]; then
-              echo "✅ Artifacts found!"
-              break
-            fi
-            sleep 2
-            elapsed=$((elapsed + 2))
-            echo "   Waiting... ($elapsed/$timeout seconds)"
-          done
-          
-          if [ $elapsed -ge $timeout ]; then
-            echo "⚠️  Timeout waiting for artifacts. Please ensure artifacts are uploaded."
-          fi
-
-      - name: Verify artifact exists
-        run: |
-          if [ ! -d "./artifacts" ] || [ -z "$(ls -A ./artifacts 2>/dev/null)" ]; then
-            echo "❌ Error: No artifacts found!"
-            echo "Available artifacts:"
-            ls -la ./artifacts/ 2>/dev/null || echo "artifacts directory does not exist"
-            exit 1
-          fi
-          
-          echo "✅ Artifacts found:"
-          ls -lh ./artifacts/
-          
-          # Verify expected files exist
-          ZIP_FILE=$(find ./artifacts -name "AriseMobile-v${{ inputs.version }}-xcframeworks.zip" -o -name "*.zip" | head -1)
-          FRAMEWORK_DIR=$(find ./artifacts -type d -name "AriseMobile.xcframework" | head -1)
-          
-          if [ -z "$ZIP_FILE" ] && [ -z "$FRAMEWORK_DIR" ]; then
-            echo "⚠️  Warning: Expected artifact files not found"
-            echo "Looking for:"
-            echo "  - AriseMobile-v${{ inputs.version }}-xcframeworks.zip"
-            echo "  - Or AriseMobile.xcframework directory"
-            echo ""
-            echo "Found files:"
-            find ./artifacts -type f -o -type d | head -10
-          else
-            if [ -n "$ZIP_FILE" ]; then
-              echo "✅ Found ZIP archive: $ZIP_FILE"
-            fi
-            if [ -n "$FRAMEWORK_DIR" ]; then
-              echo "✅ Found framework directory: $FRAMEWORK_DIR"
-            fi
-          fi
-
-      - name: Generate release notes
-        id: release_notes
-        run: |
-          if [ -n "${{ inputs.release_notes }}" ]; then
-            # Use manually provided release notes
-            NOTES="${{ inputs.release_notes }}"
-            echo "✅ Using manually provided release notes"
-          else
-            # Auto-generate from git log
-            TAG="v${{ inputs.version }}"
-            echo "📝 Auto-generating release notes for $TAG..."
-            
-            PREV_TAG=$(git describe --tags --abbrev=0 --exclude="$TAG" 2>/dev/null || echo "")
-            
-            if [ -z "$PREV_TAG" ]; then
-              # No previous tag found, generate initial release notes
-              NOTES="## 🚀 AriseMobileSdk $TAG"$'\n\n'
-              NOTES+="### 📦 Initial Release"$'\n\n'
-              NOTES+="First release of AriseMobileSdk."$'\n\n'
-              NOTES+="### 📋 Technical Details"$'\n\n'
-              NOTES+="- **Minimum iOS version:** 15.0"$'\n'
-              NOTES+="- **Minimum Xcode version:** 15.0"$'\n'
-              NOTES+="- **Minimum Swift version:** 5.9"$'\n\n'
-              NOTES+="### 📥 Installation"$'\n\n'
-              NOTES+='```swift'$'\n'
-              NOTES+="dependencies: ["$'\n'
-              NOTES+="    .package("$'\n'
-              NOTES+='        url: "https://github.com/${{ secrets.DISTRIBUTION_REPO }}.git",'$'\n'
-              NOTES+="        from: \"${{ inputs.version }}\""$'\n'
-              NOTES+="    )"$'\n'
-              NOTES+="]"$'\n'
-              NOTES+='```'
-            else
-              # Generate notes from git log between tags
-              # Get commits between tags
-              COMMITS=$(git log ${PREV_TAG}..HEAD --pretty=format:"- %s (%h)" --no-merges 2>/dev/null || echo "")
-              
-              if [ -z "$COMMITS" ]; then
-                COMMITS_TEXT="No commits found between $PREV_TAG and HEAD."
-              else
-                COMMITS_TEXT="$COMMITS"
-              fi
-              
-              NOTES="## 🚀 AriseMobileSdk $TAG"$'\n\n'
-              NOTES+="### 📦 What's New"$'\n\n'
-              NOTES+="Changes since $PREV_TAG:"$'\n\n'
-              NOTES+="$COMMITS_TEXT"$'\n\n'
-              NOTES+="### 📋 Technical Details"$'\n\n'
-              NOTES+="- **Minimum iOS version:** 15.0"$'\n'
-              NOTES+="- **Minimum Xcode version:** 15.0"$'\n'
-              NOTES+="- **Minimum Swift version:** 5.9"$'\n\n'
-              NOTES+="### 📥 Installation"$'\n\n'
-              NOTES+='```swift'$'\n'
-              NOTES+="dependencies: ["$'\n'
-              NOTES+="    .package("$'\n'
-              NOTES+='        url: "https://github.com/${{ secrets.DISTRIBUTION_REPO }}.git",'$'\n'
-              NOTES+="        from: \"${{ inputs.version }}\""$'\n'
-              NOTES+="    )"$'\n'
-              NOTES+="]"$'\n'
-              NOTES+='```'
-            fi
-            
-            echo "✅ Release notes generated"
-          fi
-          
-          # Output release notes
-          echo "notes<<EOF" >> $GITHUB_OUTPUT
-          echo "$NOTES" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
-          
-          echo ""
-          echo "📄 Generated release notes:"
-          echo "---"
-          echo "$NOTES"
-          echo "---"
-
-      - name: Prepare distribution package
-        if: inputs.skip_distribution_repo == false
-        run: |
-          echo "📦 Preparing distribution package..."
-          
-          # Extract ZIP if needed
-          ZIP_FILE=$(find ./artifacts -name "*.zip" | head -1)
-          if [ -n "$ZIP_FILE" ]; then
-            echo "Extracting ZIP archive: $ZIP_FILE"
-            unzip -q "$ZIP_FILE" -d ./artifacts-extracted || {
-              echo "⚠️  Failed to extract ZIP, trying to use as-is"
-            }
-            
-            # Check if extraction was successful
-            if [ -d "./artifacts-extracted/libs" ]; then
-              echo "✅ Extracted libs directory found"
-              mkdir -p ./distribution-package
-              cp -R ./artifacts-extracted/libs ./distribution-package/
-            fi
-          fi
-          
-          # Copy framework if it exists directly
-          FRAMEWORK_DIR=$(find ./artifacts -type d -name "AriseMobile.xcframework" | head -1)
-          if [ -n "$FRAMEWORK_DIR" ]; then
-            echo "✅ Found framework directory: $FRAMEWORK_DIR"
-            mkdir -p ./distribution-package/libs
-            cp -R "$FRAMEWORK_DIR" ./distribution-package/libs/ || true
-          fi
-          
-          # Copy Package.swift and Sources if they exist in artifacts
-          if [ -f "./artifacts/Package.swift" ]; then
-            cp ./artifacts/Package.swift ./distribution-package/
-          fi
-          if [ -d "./artifacts/Sources" ]; then
-            cp -R ./artifacts/Sources ./distribution-package/
-          fi
-          
-          echo "✅ Distribution package prepared"
-          ls -lh ./distribution-package/ 2>/dev/null || echo "Distribution package directory structure:"
-          find ./distribution-package -type f -o -type d | head -20 || true
-
-      - name: Checkout distribution repository
-        if: inputs.skip_distribution_repo == false
-        uses: actions/checkout@v4
-        with:
-          repository: ${{ secrets.DISTRIBUTION_REPO }}
-          token: ${{ secrets.DISTRIBUTION_REPO_TOKEN }}
-          path: distribution-repo
           fetch-depth: 0
 
-      - name: Configure git for distribution repo
-        if: inputs.skip_distribution_repo == false
+      - name: Extract version from branch name
+        id: version
+        run: |
+          BRANCH="${{ github.ref_name }}"
+          echo "Branch: $BRANCH"
+
+          if [[ "$BRANCH" =~ ^release/([0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
+            VERSION="${BASH_REMATCH[1]}"
+            TAG="v${VERSION}"
+
+            echo "Version: $VERSION"
+            echo "Tag: $TAG"
+
+            echo "version=$VERSION" >> $GITHUB_OUTPUT
+            echo "tag=$TAG" >> $GITHUB_OUTPUT
+          else
+            echo "Error: Branch name must be in format 'release/X.Y.Z'"
+            echo "Current branch: $BRANCH"
+            exit 1
+          fi
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          if [ -n "${{ inputs.release_notes }}" ]; then
+            echo "Using provided release notes"
+            CHANGELOG="${{ inputs.release_notes }}"
+          else
+            echo "Generating changelog from commits..."
+            CHANGELOG=$(git log --pretty=format:"- %s (%h)" --no-merges -- ios-sdk/ -20)
+
+            if [ -z "$CHANGELOG" ]; then
+              CHANGELOG="- Release ${{ steps.version.outputs.version }}"
+            fi
+          fi
+
+          echo "Changelog:"
+          echo "$CHANGELOG"
+
+          echo "changelog<<EOF" >> $GITHUB_OUTPUT
+          echo "$CHANGELOG" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+  test:
+    needs: setup
+    if: inputs.run_tests == true
+    runs-on: macos-15
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Cache for Tests
+        uses: actions/cache@v4
+        with:
+          path: |
+            ios-sdk/DerivedData-Tests
+            ios-sdk/SourcePackages
+            ~/Library/Caches/org.swift.swiftpm
+          key: ${{ runner.os }}-test-v2-${{ hashFiles('ios-sdk/src/AriseMobileSdk.xcodeproj/project.pbxproj') }}
+          restore-keys: |
+            ${{ runner.os }}-test-v2-
+
+      - name: Boot Simulator
+        run: |
+          SIMULATOR_ID=$(xcrun simctl list devices available | grep "iPhone" | head -1 | sed 's/.*(\([A-F0-9-]*\)).*/\1/')
+          xcrun simctl boot "$SIMULATOR_ID" 2>/dev/null || true
+          echo "Simulator ready"
+
+      - name: Run Tests
+        run: |
+          cd ios-sdk/libs
+          chmod +x build_and_test_ci.sh
+          ./build_and_test_ci.sh test
+
+      - name: Upload Test Results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: ios-sdk/test-results.xcresult
+          retention-days: 30
+          if-no-files-found: warn
+
+  build:
+    needs: [setup, test]
+    if: always() && needs.setup.result == 'success' && (needs.test.result == 'success' || needs.test.result == 'skipped')
+    runs-on: macos-15
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Cache for Build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ios-sdk/libs/Build
+            ios-sdk/SourcePackages
+            ~/Library/Caches/org.swift.swiftpm
+          key: ${{ runner.os }}-build-v2-${{ hashFiles('ios-sdk/src/AriseMobileSdk.xcodeproj/project.pbxproj') }}
+          restore-keys: |
+            ${{ runner.os }}-build-v2-
+
+      - name: Build XCFramework
+        env:
+          MARKETING_VERSION: ${{ needs.setup.outputs.version }}
+          BUILD_NUMBER: ${{ github.run_number }}
+        run: |
+          cd ios-sdk/libs
+          chmod +x build_and_test_ci.sh
+          echo "Building with version: ${MARKETING_VERSION}"
+          ./build_and_test_ci.sh build
+          echo "Framework built"
+
+      - name: Prepare Distribution
+        run: |
+          mkdir -p ios-sdk/Distribution/libs
+
+          if [ -d "ios-sdk/libs/AriseMobile.xcframework" ]; then
+            cp -R ios-sdk/libs/AriseMobile.xcframework ios-sdk/Distribution/libs/
+          fi
+
+          if [ -d "ios-sdk/libs/CloudCommerce.xcframework" ]; then
+            cp -R ios-sdk/libs/CloudCommerce.xcframework ios-sdk/Distribution/libs/
+          fi
+
+          echo "Frameworks prepared"
+          ls -lh ios-sdk/Distribution/libs/
+
+      - name: Create Archive
+        run: |
+          cd ios-sdk/Distribution
+          VERSION="${{ needs.setup.outputs.version }}"
+          ARCHIVE="AriseMobileSdk-v${VERSION}-xcframeworks.zip"
+          zip -r "$ARCHIVE" libs/
+          echo "Archive: $ARCHIVE"
+
+      - name: Upload Build Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-sdk-build
+          path: ios-sdk/Distribution/
+          retention-days: 1
+
+  release:
+    needs: [setup, build]
+    if: always() && needs.setup.result == 'success' && needs.build.result == 'success'
+    runs-on: macos-15
+    timeout-minutes: 15
+
+    steps:
+      - name: Download Build Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ios-sdk-build
+          path: distribution-files/
+
+      - name: Setup Distribution Repository
+        run: |
+          REPO_URL="https://x-access-token:${{ secrets.DISTRIBUTION_REPO_TOKEN }}@github.com/${{ secrets.DISTRIBUTION_REPO }}.git"
+
+          git clone "$REPO_URL" distribution-repo 2>/dev/null || {
+            mkdir distribution-repo
+            cd distribution-repo
+            git init
+            git remote add origin "$REPO_URL"
+          }
+
+          cd distribution-repo
+          git fetch origin --tags 2>/dev/null || true
+
+          if git ls-remote --heads origin release | grep -q release; then
+            git checkout release
+            git pull origin release
+          else
+            git checkout -b release
+          fi
+
+      - name: Configure Git
         working-directory: distribution-repo
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-      - name: Check if tag already exists
-        id: check_tag
+      - name: Copy Files
         run: |
-          TAG="v${{ inputs.version }}"
-          
-          if [ "${{ inputs.skip_distribution_repo }}" == "false" ]; then
-            # Check in distribution repository
-            if git -C distribution-repo rev-parse "$TAG" >/dev/null 2>&1; then
-              echo "exists=true" >> $GITHUB_OUTPUT
-              echo "⚠️  Tag $TAG already exists in distribution repository"
-            else
-              echo "exists=false" >> $GITHUB_OUTPUT
-              echo "✅ Tag $TAG does not exist in distribution repository"
-            fi
-          else
-            # Check in current repository
-            if git rev-parse "$TAG" >/dev/null 2>&1; then
-              echo "exists=true" >> $GITHUB_OUTPUT
-              echo "⚠️  Tag $TAG already exists in current repository"
-            else
-              echo "exists=false" >> $GITHUB_OUTPUT
-              echo "✅ Tag $TAG does not exist in current repository"
-            fi
-          fi
+          cp distribution-files/Package.swift distribution-repo/ 2>/dev/null || true
+          cp distribution-files/README.md distribution-repo/ 2>/dev/null || true
 
-      - name: Update distribution repository
-        if: inputs.skip_distribution_repo == false && steps.check_tag.outputs.exists == 'false'
-        run: |
-          echo "📝 Updating distribution repository..."
-          
-          # Copy files to distribution repository
-          if [ -d "./distribution-package" ]; then
-            # Copy Package.swift if exists
-            if [ -f "./distribution-package/Package.swift" ]; then
-              cp ./distribution-package/Package.swift distribution-repo/
-            fi
-            
-            # Copy Sources if exists
-            if [ -d "./distribution-package/Sources" ]; then
-              mkdir -p distribution-repo/Sources
-              cp -R ./distribution-package/Sources/* distribution-repo/Sources/
-            fi
-            
-            # Copy libs
-            if [ -d "./distribution-package/libs" ]; then
-              mkdir -p distribution-repo/libs
-              rm -rf distribution-repo/libs/*
-              cp -R ./distribution-package/libs/* distribution-repo/libs/
-            fi
-          else
-            # Fallback: copy from artifacts directly
-            if [ -d "./artifacts/libs" ]; then
-              mkdir -p distribution-repo/libs
-              cp -R ./artifacts/libs/* distribution-repo/libs/
-            fi
-          fi
-          
-          # Copy Package.swift and Sources from source if not in artifacts
-          if [ ! -f "distribution-repo/Package.swift" ]; then
-            if [ -f "ios-sdk/Distribution/Package.swift" ]; then
-              cp ios-sdk/Distribution/Package.swift distribution-repo/
-            fi
-          fi
-          
-          if [ ! -d "distribution-repo/Sources" ]; then
-            if [ -d "ios-sdk/Distribution/Sources" ]; then
-              mkdir -p distribution-repo/Sources
-              cp -R ios-sdk/Distribution/Sources/* distribution-repo/Sources/
-            fi
-          fi
-          
-          echo "✅ Files copied to distribution repository"
+          mkdir -p distribution-repo/Sources
+          cp -R distribution-files/Sources/* distribution-repo/Sources/ 2>/dev/null || true
 
-      - name: Commit and push to distribution repository
-        if: inputs.skip_distribution_repo == false && steps.check_tag.outputs.exists == 'false'
+          mkdir -p distribution-repo/libs
+          rm -rf distribution-repo/libs/*
+          cp -R distribution-files/libs/* distribution-repo/libs/
+
+          echo "Files copied"
+
+      - name: Commit and Push
         working-directory: distribution-repo
         run: |
-          git checkout main || git checkout -b main
           git add .
+
           if git diff --staged --quiet; then
-            echo "No changes to commit"
+            echo "No changes"
           else
-            git commit -m "Release version ${{ inputs.version }}"
-            git push origin main || git push -u origin main
-            echo "✅ Changes pushed to distribution repository"
+            VERSION="${{ needs.setup.outputs.version }}"
+            git commit -m "Release v${VERSION}"
+            git push -u origin release
+            echo "Pushed to release branch"
           fi
 
-      - name: Create git tag in distribution repository
-        if: inputs.skip_distribution_repo == false && steps.check_tag.outputs.exists == 'false'
+      - name: Create Tag
         working-directory: distribution-repo
         run: |
-          TAG="v${{ inputs.version }}"
-          git tag -a "$TAG" -m "Release $TAG"
-          git push origin "$TAG"
-          echo "✅ Tag $TAG created and pushed to distribution repository"
+          TAG="${{ needs.setup.outputs.tag }}"
 
-      - name: Prepare release artifacts
-        if: steps.check_tag.outputs.exists == 'false'
-        run: |
-          echo "📦 Preparing release artifacts..."
-          mkdir -p ./release-artifacts
-          
-          # Find and copy ZIP file
-          ZIP_FILE=$(find ./artifacts -name "*.zip" | head -1)
-          if [ -n "$ZIP_FILE" ]; then
-            cp "$ZIP_FILE" ./release-artifacts/
-            echo "✅ Copied ZIP file: $(basename "$ZIP_FILE")"
-          else
-            # Create ZIP from framework if no ZIP exists
-            FRAMEWORK_DIR=$(find ./artifacts -type d -name "AriseMobile.xcframework" | head -1)
-            if [ -n "$FRAMEWORK_DIR" ]; then
-              echo "Creating ZIP from framework..."
-              cd "$(dirname "$FRAMEWORK_DIR")"
-              zip -r "../../release-artifacts/AriseMobile-v${{ inputs.version }}-xcframeworks.zip" "$(basename "$FRAMEWORK_DIR")" || {
-                cd - && mkdir -p libs && cp -R "$FRAMEWORK_DIR" libs/ && zip -r "../release-artifacts/AriseMobile-v${{ inputs.version }}-xcframeworks.zip" libs/
-              }
-              cd - || true
-              echo "✅ Created ZIP archive"
-            fi
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            git tag -d "$TAG"
           fi
-          
-          echo "📦 Release artifacts prepared:"
-          ls -lh ./release-artifacts/
+
+          if git ls-remote --tags origin "refs/tags/${TAG}" | grep -q .; then
+            echo "Tag $TAG already exists remotely, skipping"
+          else
+            git tag -a "$TAG" -m "Release $TAG"
+            git push origin "$TAG"
+            echo "Tag $TAG created"
+          fi
+
+      - name: Find Archive
+        id: archive
+        run: |
+          ARCHIVE=$(ls distribution-files/*.zip 2>/dev/null | head -1)
+          echo "path=$ARCHIVE" >> $GITHUB_OUTPUT
+          echo "Archive: $ARCHIVE"
 
       - name: Create GitHub Release
-        if: steps.check_tag.outputs.exists == 'false'
         uses: softprops/action-gh-release@v1
         with:
           repository: ${{ secrets.DISTRIBUTION_REPO }}
           token: ${{ secrets.DISTRIBUTION_REPO_TOKEN }}
-          tag_name: v${{ inputs.version }}
-          name: AriseMobileSdk v${{ inputs.version }}
-          body: ${{ steps.release_notes.outputs.notes }}
-          files: ./release-artifacts/*
-          draft: false
+          tag_name: ${{ needs.setup.outputs.tag }}
+          name: AriseMobileSdk ${{ needs.setup.outputs.tag }}
           prerelease: false
+          body: |
+            ## AriseMobileSdk ${{ needs.setup.outputs.tag }}
+
+            **Type:** Production Release
+
+            ### Changes
+
+            ${{ needs.setup.outputs.changelog }}
+
+            ### Installation
+
+            ```swift
+            .package(url: "https://github.com/${{ secrets.DISTRIBUTION_REPO }}.git", from: "${{ needs.setup.outputs.version }}")
+            ```
+          files: ${{ steps.archive.outputs.path }}
+          draft: false
 
       - name: Summary
-        if: always()
         run: |
-          echo "## 🚀 Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "## Release Complete" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### 📋 Deployment Details" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "- **Version:** \`${{ inputs.version }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "- **Tag:** \`v${{ inputs.version }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "- **Artifact Source:** \`${{ inputs.artifact_source }}\`" >> $GITHUB_STEP_SUMMARY
-          if [ "${{ inputs.skip_distribution_repo }}" == "true" ]; then
-            echo "- **Distribution Repo:** ⏭️ Skipped" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "- **Distribution Repo:** ✅ Updated" >> $GITHUB_STEP_SUMMARY
-          fi
-          echo "" >> $GITHUB_STEP_SUMMARY
-          if [ "${{ steps.check_tag.outputs.exists }}" == "true" ]; then
-            echo "### ⚠️ Status: Tag Already Exists" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "The tag \`v${{ inputs.version }}\` already exists. Release was skipped." >> $GITHUB_STEP_SUMMARY
-          else
-            echo "### ✅ Status: Release Created Successfully" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "Release \`v${{ inputs.version }}\` has been created and published." >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "### 📦 Installation" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "\`\`\`swift" >> $GITHUB_STEP_SUMMARY
-            echo "dependencies: [" >> $GITHUB_STEP_SUMMARY
-            echo "    .package(" >> $GITHUB_STEP_SUMMARY
-            echo "        url: \"https://github.com/${{ secrets.DISTRIBUTION_REPO }}.git\"," >> $GITHUB_STEP_SUMMARY
-            echo "        from: \"${{ inputs.version }}\"" >> $GITHUB_STEP_SUMMARY
-            echo "    )" >> $GITHUB_STEP_SUMMARY
-            echo "]" >> $GITHUB_STEP_SUMMARY
-            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-          fi
-
+          echo "| Property | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Version | ${{ needs.setup.outputs.version }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Tag | ${{ needs.setup.outputs.tag }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Branch | release |" >> $GITHUB_STEP_SUMMARY
