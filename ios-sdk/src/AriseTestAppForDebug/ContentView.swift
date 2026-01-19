@@ -368,14 +368,14 @@ struct ContentView: View {
 
         // for UAT
         //Caio's Barber Shop
-//        let clientId = "c77a6b77-2545-4352-98dc-60de53d11eb7"
-//        let clientSecret = "cddb9e9c-fa48-4dbc-96e7-86739959e92a"
+        let clientId = "c77a6b77-2545-4352-98dc-60de53d11eb7"
+        let clientSecret = "cddb9e9c-fa48-4dbc-96e7-86739959e92a"
         
         
         
         // Andriy
-        let clientId = "550d101e-48f0-4be7-8083-ac68e9805780"
-        let clientSecret = "31771069-4d24-45af-b73d-69cf9e559985"
+//        let clientId = "550d101e-48f0-4be7-8083-ac68e9805780"
+//        let clientSecret = "31771069-4d24-45af-b73d-69cf9e559985"
         
 //        let clientId = "e979b249-2223-4bde-9ff9-b9f427bef45b"
 //        let clientSecret = "b608dd76-97e4-453c-a2f2-54b6b8ad81a8"
