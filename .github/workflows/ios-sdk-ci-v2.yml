@@ -224,12 +224,14 @@ jobs:
           DIST_REPO_TOKEN: ${{ secrets.DISTRIBUTION_REPO_TOKEN }}
           DIST_REPO: ${{ secrets.DISTRIBUTION_REPO }}
         run: |
-          echo "📝 Generating changelog..."
+          echo "Generating changelog..."
 
           RELEASE_TYPE="${{ steps.release_type.outputs.type }}"
           REPO_URL="https://x-access-token:${DIST_REPO_TOKEN}@github.com/${DIST_REPO}.git"
 
           PREV_TAG=""
+          PREV_TAG_DATE=""
+
           if git clone --bare --filter=blob:none "$REPO_URL" dist-repo-changelog 2>/dev/null; then
             cd dist-repo-changelog
             if [[ "$RELEASE_TYPE" == "uat" ]]; then
@@ -237,23 +239,30 @@ jobs:
             else
               PREV_TAG=$(git tag -l "v*" | grep -v "\-uat" | sort -V | tail -1)
             fi
+
+            if [ -n "$PREV_TAG" ]; then
+              PREV_TAG_DATE=$(git log -1 --format="%ci" "$PREV_TAG" 2>/dev/null || echo "")
+            fi
             cd ..
             rm -rf dist-repo-changelog
           fi
 
-          echo "📌 Previous tag: ${PREV_TAG:-none}"
+          echo "Previous tag: ${PREV_TAG:-none}"
+          echo "Previous tag date: ${PREV_TAG_DATE:-none}"
 
-          if [ -n "$PREV_TAG" ]; then
-            CHANGELOG=$(git log --pretty=format:"- %s (%h)" --no-merges -- ios-sdk/ | head -20)
+          if [ -n "$PREV_TAG_DATE" ]; then
+            echo "Getting commits since: $PREV_TAG_DATE"
+            CHANGELOG=$(git log --since="$PREV_TAG_DATE" --pretty=format:"- %s (%h)" --no-merges -- ios-sdk/ | head -30)
           else
-            CHANGELOG=$(git log --pretty=format:"- %s (%h)" --no-merges -- ios-sdk/ | head -20)
+            echo "No previous tag found, getting recent commits"
+            CHANGELOG=$(git log --pretty=format:"- %s (%h)" --no-merges -- ios-sdk/ -10)
           fi
 
           if [ -z "$CHANGELOG" ]; then
             CHANGELOG="- Initial release"
           fi
 
-          echo "📋 Changelog:"
+          echo "Changelog:"
           echo "$CHANGELOG"
 
           echo "changelog<<EOF" >> $GITHUB_OUTPUT
@@ -267,7 +276,7 @@ jobs:
     needs: setup
     if: needs.setup.outputs.should_release == 'true'
     runs-on: macos-15
-    timeout-minutes: 30
+    timeout-minutes: 60
 
     steps:
       - name: Checkout
