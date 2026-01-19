@@ -35,46 +35,60 @@ jobs:
 
           REPO_URL="https://x-access-token:${DIST_REPO_TOKEN}@github.com/${DIST_REPO}.git"
 
-          LAST_TAG=""
+          ALL_TAGS=""
+          PRERELEASE_TAGS=""
           if git clone --bare --filter=blob:none "$REPO_URL" dist-repo-tags 2>/dev/null; then
             cd dist-repo-tags
-            LAST_TAG=$(git tag -l "v*-pre-release-*" | sort -V | tail -1)
+            ALL_TAGS=$(git tag -l "v*" | grep -v "pre-release" || echo "")
+            PRERELEASE_TAGS=$(git tag -l "v*-pre-release-*" || echo "")
             cd ..
             rm -rf dist-repo-tags
           fi
 
-          echo "Last pre-release tag: ${LAST_TAG:-none}"
+          echo "Production tags: ${ALL_TAGS:-none}"
+          echo "Pre-release tags: ${PRERELEASE_TAGS:-none}"
+
+          HIGHEST_PROD=$(echo "$ALL_TAGS" | sort -V | tail -1)
+          HIGHEST_PROD_VERSION=""
+          if [ -n "$HIGHEST_PROD" ]; then
+            HIGHEST_PROD_VERSION=$(echo "$HIGHEST_PROD" | sed 's/^v//')
+            echo "Highest production version: $HIGHEST_PROD_VERSION"
+          fi
 
           PLIST_VERSION=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" ios-sdk/src/AriseMobileSdk/AriseMobileSdk-Info.plist 2>/dev/null || echo "1.0.0")
           PLIST_MAJOR=$(echo $PLIST_VERSION | cut -d. -f1)
           echo "Info.plist version: $PLIST_VERSION (major: $PLIST_MAJOR)"
 
-          if [ -n "$LAST_TAG" ]; then
-            TAG_VERSION=$(echo "$LAST_TAG" | sed 's/^v//' | sed 's/-pre-release-.*//')
-            TAG_MAJOR=$(echo "$TAG_VERSION" | cut -d. -f1)
-            TAG_BUILD=$(echo "$LAST_TAG" | sed 's/.*-pre-release-//')
+          if [ -n "$HIGHEST_PROD_VERSION" ]; then
+            PROD_MAJOR=$(echo "$HIGHEST_PROD_VERSION" | cut -d. -f1)
 
-            echo "Tag version: $TAG_VERSION (major: $TAG_MAJOR, build: $TAG_BUILD)"
-
-            if [ "$PLIST_MAJOR" -gt "$TAG_MAJOR" ]; then
-              echo "Info.plist major ($PLIST_MAJOR) > tag major ($TAG_MAJOR), using plist version"
+            if [ "$PLIST_MAJOR" -gt "$PROD_MAJOR" ]; then
+              echo "Info.plist major ($PLIST_MAJOR) > production major ($PROD_MAJOR), using plist version"
               BASE_VERSION="$PLIST_VERSION"
-              BUILD_NUMBER=1
             else
-              BASE_VERSION="$TAG_VERSION"
-              BUILD_NUMBER=$((TAG_BUILD + 1))
+              BASE_VERSION="$HIGHEST_PROD_VERSION"
             fi
           else
-            echo "No previous tags found, using plist version"
+            echo "No production tags found, using plist version"
             BASE_VERSION="$PLIST_VERSION"
+          fi
+
+          echo "Base version for pre-release: $BASE_VERSION"
+
+          MATCHING_PRERELEASE=$(echo "$PRERELEASE_TAGS" | grep "^v${BASE_VERSION}-pre-release-" | sort -V | tail -1)
+
+          if [ -n "$MATCHING_PRERELEASE" ]; then
+            LAST_BUILD=$(echo "$MATCHING_PRERELEASE" | sed 's/.*-pre-release-//')
+            BUILD_NUMBER=$((LAST_BUILD + 1))
+            echo "Last pre-release for $BASE_VERSION: $MATCHING_PRERELEASE (build: $LAST_BUILD)"
+          else
             BUILD_NUMBER=1
+            echo "No pre-releases for $BASE_VERSION, starting at build 1"
           fi
 
           VERSION="${BASE_VERSION}-pre-release-${BUILD_NUMBER}"
           TAG="v${VERSION}"
 
-          echo "Base version: $BASE_VERSION"
-          echo "Build number: $BUILD_NUMBER"
           echo "Final version: $VERSION"
           echo "Tag: $TAG"
 
@@ -356,10 +370,27 @@ jobs:
         run: |
           echo "Cleaning up old pre-releases (keeping last 5)..."
 
-          RELEASES=$(gh release list --repo "${{ secrets.DISTRIBUTION_REPO }}" --limit 100 --json tagName,isPrerelease | jq -r '.[] | select(.isPrerelease == true) | .tagName' | grep "pre-release" | sort -V)
+          echo "Fetching releases from ${{ secrets.DISTRIBUTION_REPO }}..."
+          RAW_RELEASES=$(gh release list --repo "${{ secrets.DISTRIBUTION_REPO }}" --limit 100 --json tagName,isPrerelease 2>&1) || {
+            echo "Failed to fetch releases: $RAW_RELEASES"
+            exit 0
+          }
 
-          COUNT=$(echo "$RELEASES" | grep -c . || echo "0")
-          echo "Found $COUNT pre-releases"
+          echo "Raw releases:"
+          echo "$RAW_RELEASES" | head -20
+
+          RELEASES=$(echo "$RAW_RELEASES" | jq -r '.[] | select(.isPrerelease == true) | .tagName' | grep "pre-release" | sort -V)
+
+          if [ -z "$RELEASES" ]; then
+            echo "No pre-releases found"
+            exit 0
+          fi
+
+          echo "Pre-releases found:"
+          echo "$RELEASES"
+
+          COUNT=$(echo "$RELEASES" | wc -l | tr -d ' ')
+          echo "Total count: $COUNT"
 
           if [ "$COUNT" -gt 5 ]; then
             DELETE_COUNT=$((COUNT - 5))
@@ -368,14 +399,17 @@ jobs:
             TO_DELETE=$(echo "$RELEASES" | head -n $DELETE_COUNT)
 
             for TAG in $TO_DELETE; do
-              echo "Deleting release and tag: $TAG"
-              gh release delete "$TAG" --repo "${{ secrets.DISTRIBUTION_REPO }}" --yes 2>/dev/null || true
-              gh api --method DELETE "/repos/${{ secrets.DISTRIBUTION_REPO }}/git/refs/tags/$TAG" 2>/dev/null || true
+              echo "Deleting release: $TAG"
+              gh release delete "$TAG" --repo "${{ secrets.DISTRIBUTION_REPO }}" --yes --cleanup-tag || {
+                echo "Failed to delete release $TAG, trying alternative..."
+                gh release delete "$TAG" --repo "${{ secrets.DISTRIBUTION_REPO }}" --yes || true
+                gh api --method DELETE "/repos/${{ secrets.DISTRIBUTION_REPO }}/git/refs/tags/$TAG" || true
+              }
             done
 
             echo "Cleanup complete"
           else
-            echo "No cleanup needed"
+            echo "No cleanup needed (have $COUNT, keeping 5)"
           fi
 
       - name: Summary
