@@ -126,8 +126,7 @@ jobs:
           if-no-files-found: warn
 
   build:
-    needs: [setup, test]
-    if: always() && needs.setup.result == 'success' && (needs.test.result == 'success' || needs.test.result == 'skipped')
+    needs: setup
     runs-on: macos-15
     timeout-minutes: 30
 
@@ -193,8 +192,8 @@ jobs:
           retention-days: 1
 
   release:
-    needs: [setup, build]
-    if: always() && needs.setup.result == 'success' && needs.build.result == 'success'
+    needs: [setup, test, build]
+    if: always() && needs.setup.result == 'success' && needs.build.result == 'success' && (needs.test.result == 'success' || needs.test.result == 'skipped')
     runs-on: macos-15
     timeout-minutes: 15
 
