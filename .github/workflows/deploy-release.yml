@@ -10,10 +10,11 @@ on:
 
   workflow_dispatch:
     inputs:
-      release_notes:
-        description: 'Release notes (markdown supported)'
+      release_notes_file:
+        description: 'Path to release notes file (default: ios-sdk/RELEASE_NOTES.md)'
         required: false
         type: string
+        default: 'ios-sdk/RELEASE_NOTES.md'
       run_tests:
         description: 'Run tests before release'
         required: false
@@ -59,11 +60,13 @@ jobs:
       - name: Generate changelog
         id: changelog
         run: |
-          if [ -n "${{ inputs.release_notes }}" ]; then
-            echo "Using provided release notes"
-            CHANGELOG="${{ inputs.release_notes }}"
+          NOTES_FILE="${{ inputs.release_notes_file || 'ios-sdk/RELEASE_NOTES.md' }}"
+
+          if [ -f "$NOTES_FILE" ]; then
+            echo "Reading release notes from: $NOTES_FILE"
+            CHANGELOG=$(cat "$NOTES_FILE")
           else
-            echo "Generating changelog from commits..."
+            echo "File $NOTES_FILE not found, generating from commits..."
             CHANGELOG=$(git log --pretty=format:"- %s (%h)" --no-merges -- ios-sdk/ -20)
 
             if [ -z "$CHANGELOG" ]; then
