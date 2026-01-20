@@ -162,13 +162,13 @@ Every push to `main` creates a pre-release automatically:
 
 To create a production release:
 
-1. Create a branch with format `release/X.Y.Z`:
+1. Create and push a branch with format `release/X.Y.Z`:
    ```bash
    git checkout -b release/2.0.0
    git push origin release/2.0.0
    ```
 
-2. (Optional) Add release notes file before pushing:
+2. (Optional) Add release notes file:
    ```bash
    # Create ios-sdk/RELEASE_NOTES.md with your changes
    git add ios-sdk/RELEASE_NOTES.md
@@ -176,8 +176,15 @@ To create a production release:
    git push origin release/2.0.0
    ```
 
-3. The workflow will:
-   - Build and (optionally) test the SDK
+3. **Manually trigger** the workflow:
+   - Go to Actions → "Deploy iOS SDK Release"
+   - Click "Run workflow"
+   - Select branch `release/X.Y.Z`
+   - (Optional) Specify path to release notes file, or leave empty for auto-generated changelog
+   - Click "Run workflow"
+
+4. The workflow will:
+   - Build the SDK
    - Push to `release` branch in distribution repo
    - Create a production release with tag `vX.Y.Z`
 
