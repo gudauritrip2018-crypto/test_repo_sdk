@@ -1,13 +1,6 @@
 name: Deploy iOS SDK Release
 
 on:
-  push:
-    branches:
-      - 'release/*'
-    paths:
-      - 'ios-sdk/**'
-      - '.github/workflows/deploy-release.yml'
-
   workflow_dispatch:
     inputs:
       release_notes_file:
