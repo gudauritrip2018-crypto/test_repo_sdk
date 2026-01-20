@@ -371,7 +371,7 @@ jobs:
           echo "Cleaning up old pre-releases (keeping last 5)..."
 
           echo "Fetching releases from ${{ secrets.DISTRIBUTION_REPO }}..."
-          RAW_RELEASES=$(gh release list --repo "${{ secrets.DISTRIBUTION_REPO }}" --limit 100 --json tagName,isPrerelease 2>&1) || {
+          RAW_RELEASES=$(gh release list --repo "${{ secrets.DISTRIBUTION_REPO }}" --limit 100 --json tagName,isPrerelease,createdAt 2>&1) || {
             echo "Failed to fetch releases: $RAW_RELEASES"
             exit 0
           }
@@ -379,14 +379,15 @@ jobs:
           echo "Raw releases:"
           echo "$RAW_RELEASES" | head -20
 
-          RELEASES=$(echo "$RAW_RELEASES" | jq -r '.[] | select(.isPrerelease == true) | .tagName' | grep "pre-release" | sort -V)
+          # Get ALL pre-releases (by isPrerelease flag), sorted by date (oldest first)
+          RELEASES=$(echo "$RAW_RELEASES" | jq -r '.[] | select(.isPrerelease == true) | .tagName + " " + .createdAt' | sort -k2 | awk '{print $1}')
 
           if [ -z "$RELEASES" ]; then
             echo "No pre-releases found"
             exit 0
           fi
 
-          echo "Pre-releases found:"
+          echo "Pre-releases found (oldest first):"
           echo "$RELEASES"
 
           COUNT=$(echo "$RELEASES" | wc -l | tr -d ' ')
@@ -394,7 +395,7 @@ jobs:
 
           if [ "$COUNT" -gt 5 ]; then
             DELETE_COUNT=$((COUNT - 5))
-            echo "Deleting $DELETE_COUNT old pre-releases..."
+            echo "Deleting $DELETE_COUNT oldest pre-releases..."
 
             TO_DELETE=$(echo "$RELEASES" | head -n $DELETE_COUNT)
 
