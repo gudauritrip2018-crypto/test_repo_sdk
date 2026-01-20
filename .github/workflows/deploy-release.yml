@@ -59,6 +59,9 @@ jobs:
 
       - name: Generate changelog
         id: changelog
+        env:
+          DIST_REPO_TOKEN: ${{ secrets.DISTRIBUTION_REPO_TOKEN }}
+          DIST_REPO: ${{ secrets.DISTRIBUTION_REPO }}
         run: |
           NOTES_FILE="${{ inputs.release_notes_file || 'ios-sdk/RELEASE_NOTES.md' }}"
 
@@ -66,8 +69,35 @@ jobs:
             echo "Reading release notes from: $NOTES_FILE"
             CHANGELOG=$(cat "$NOTES_FILE")
           else
-            echo "File $NOTES_FILE not found, generating from commits..."
-            CHANGELOG=$(git log --pretty=format:"- %s (%h)" --no-merges -- ios-sdk/ -20)
+            echo "File $NOTES_FILE not found, generating from commits since last release..."
+
+            # Find the last release tag from distribution repo
+            LAST_TAG=""
+            if git clone --bare --filter=blob:none "https://x-access-token:${DIST_REPO_TOKEN}@github.com/${DIST_REPO}.git" dist-repo-tags 2>/dev/null; then
+              cd dist-repo-tags
+              # Get production tags (exclude pre-release), sort by version, get the latest
+              LAST_TAG=$(git tag -l "v*" | grep -v "pre-release" | sort -V | tail -1)
+              cd ..
+              rm -rf dist-repo-tags
+            fi
+
+            if [ -n "$LAST_TAG" ]; then
+              echo "Last release tag: $LAST_TAG"
+              # Find the commit date of the last tag in distribution repo
+              # and get commits since that date in this repo
+              LAST_TAG_DATE=$(git clone --bare --filter=blob:none "https://x-access-token:${DIST_REPO_TOKEN}@github.com/${DIST_REPO}.git" dist-repo-date 2>/dev/null && cd dist-repo-date && git log -1 --format="%ci" "$LAST_TAG" 2>/dev/null && cd .. && rm -rf dist-repo-date || echo "")
+
+              if [ -n "$LAST_TAG_DATE" ]; then
+                echo "Last release date: $LAST_TAG_DATE"
+                CHANGELOG=$(git log --since="$LAST_TAG_DATE" --pretty=format:"- %s (%h)" --no-merges -- ios-sdk/)
+              else
+                echo "Could not get last tag date, using last 20 commits"
+                CHANGELOG=$(git log --pretty=format:"- %s (%h)" --no-merges -- ios-sdk/ -20)
+              fi
+            else
+              echo "No previous release tags found, using last 20 commits"
+              CHANGELOG=$(git log --pretty=format:"- %s (%h)" --no-merges -- ios-sdk/ -20)
+            fi
 
             if [ -z "$CHANGELOG" ]; then
               CHANGELOG="- Release ${{ steps.version.outputs.version }}"

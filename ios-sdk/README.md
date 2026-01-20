@@ -144,88 +144,154 @@ The standalone test app in `test-app/` is for testing the ready-built framework:
 - Swift 5.9+
 
 
-### Advanced CI/CD Configuration
+## CI/CD Pipeline
 
-#### Custom DerivedData Location
+| Branch | Release Type | Version Example |
+|--------|-------------|-----------------|
+| `main` | Pre-release | `v2.0.0-pre-release-5` |
+| `release/X.Y.Z` | Production | `v2.0.0` |
 
-Override the DerivedData location for local testing:
+### Pre-release (main branch)
+
+Every push to `main` creates a pre-release automatically:
+- Version format: `{plist_version}-pre-release-{build_number}`
+- Build number increments based on previous tags
+- Only last 5 pre-releases are kept, older ones are deleted
+
+### Production Release
+
+To create a production release:
+
+1. Create a branch with format `release/X.Y.Z`:
+   ```bash
+   git checkout -b release/2.0.0
+   git push origin release/2.0.0
+   ```
+
+2. (Optional) Add release notes file before pushing:
+   ```bash
+   # Create ios-sdk/RELEASE_NOTES.md with your changes
+   git add ios-sdk/RELEASE_NOTES.md
+   git commit -m "Add release notes for v2.0.0"
+   git push origin release/2.0.0
+   ```
+
+3. The workflow will:
+   - Build and (optionally) test the SDK
+   - Push to `release` branch in distribution repo
+   - Create a production release with tag `vX.Y.Z`
+
+### Release Notes
+
+Release notes can be provided via `ios-sdk/RELEASE_NOTES.md` file (markdown supported):
+
+```markdown
+### New Features
+- Added new payment method support
+- Improved TTP compatibility checks
+
+### Bug Fixes
+- Fixed timeout issue in authentication
+
+### Breaking Changes
+- Changed `authenticate()` method signature
+```
+
+#### Auto-generated Changelog
+
+If `RELEASE_NOTES.md` doesn't exist, the workflow automatically generates a changelog:
+
+| Release Type | Changelog Source |
+|--------------|------------------|
+| **Production** (`release/X.Y.Z`) | Commits since the last production release tag |
+| **Pre-release** (`main`) | Commits since the last pre-release tag |
+
+The auto-generated changelog includes all commits in `ios-sdk/` folder since the previous release, formatted as:
+```
+- Commit message (abc1234)
+- Another commit message (def5678)
+```
+
+> **Note:** If no previous releases exist, the last 20 commits are used as fallback.
+
+### Breaking Changes (Major Version Update)
+
+When introducing breaking changes, update the major version in Info.plist:
+
+1. Open `src/AriseMobileSdk/AriseMobileSdk-Info.plist`
+2. Update `CFBundleShortVersionString` to the new major version (e.g., `2.0.0`)
+3. Commit and push
+
+The CI workflow will automatically detect that the plist major version is higher than the current tags and use it as the new baseline.
+
+### GitHub Setup
+
+1. **Create distribution repository** (empty repo for SPM distribution)
+
+2. **Create Personal Access Token**:
+   - GitHub → Settings → Developer settings → Personal access tokens → Tokens (classic)
+   - Generate new token with `repo` scope
+
+3. **Add repository secrets** (Settings → Secrets and variables → Actions → New repository secret):
+
+   | Secret | Value |
+   |--------|-------|
+   | `DISTRIBUTION_REPO` | `your-org/sdk-distribution` |
+   | `DISTRIBUTION_REPO_TOKEN` | `ghp_xxxxxxxxxxxx` |
+
+4. **Enable Actions** (Settings → Actions → General):
+   - Allow all actions
+   - Workflow permissions: Read and write
+
+### Distribution Folder Structure
+
+```
+Distribution/
+├── Package.swift    # SPM package manifest (copied to distribution repo)
+├── README.md        # SDK documentation for distribution repo
+├── Sources/         # Swift wrapper files for SPM
+│   └── AriseMobileSdkIos/
+└── libs/            # Built XCFrameworks (created by CI)
+```
+
+| File | Purpose |
+|------|---------|
+| `Package.swift` | Defines SPM package, dependencies, and binary targets |
+| `Sources/` | Minimal Swift files required by SPM package structure |
+| `libs/` | Contains built `.xcframework` files (populated during CI build) |
+
+---
+
+## SDK Integration (SPM)
+
+**Production** (auto-updates):
+```swift
+.package(url: "https://github.com/your-org/sdk-distribution.git", from: "1.0.0")
+```
+
+**UAT** (fixed version):
+```swift
+.package(url: "https://github.com/your-org/sdk-distribution.git", exact: "1.0.1-uat")
+```
+
+In Xcode: File → Add Package Dependencies → select version rule.
+
+---
+
+## Local Development
 
 ```bash
-export DERIVED_DATA_OVERRIDE=~/CustomDerivedData
-./libs/test_ci.sh
+./libs/build_framework.sh          # Build XCFramework
+./libs/build_and_test_ci.sh test   # Run tests
+./libs/build_and_test_ci.sh both   # Build and test
 ```
 
-#### Running Specific Tests
+---
 
-Run specific test classes or methods:
+## Troubleshooting
 
-```bash
-xcodebuild test \
-  -project src/AriseMobileSdk.xcodeproj \
-  -scheme AriseMobileSdk \
-  -destination 'platform=iOS Simulator,name=iPhone 15' \
-  -only-testing:AriseMobileSdkTests/TransactionsServiceTests
-```
-
-#### Complete GitHub Actions Workflow with Caching
-
-```yaml
-name: CI/CD Pipeline
-
-on:
-  push:
-    branches: [ main, develop ]
-  pull_request:
-    branches: [ main, develop ]
-
-jobs:
-  build-and-test:
-    runs-on: macos-14
-    
-    steps:
-    - uses: actions/checkout@v4
-    
-    - name: Select Xcode
-      run: sudo xcode-select -s /Applications/Xcode_15.0.app
-    
-    - name: Cache DerivedData
-      uses: actions/cache@v3
-      with:
-        path: ios-sdk/DerivedData-Tests
-        key: ${{ runner.os }}-deriveddata-${{ hashFiles('**/Package.resolved') }}
-        restore-keys: |
-          ${{ runner.os }}-deriveddata-
-    
-    - name: Build and Test
-      run: |
-        cd ios-sdk
-        ./libs/build_and_test_ci.sh both
-      
-    - name: Upload Test Results
-      if: always()
-      uses: actions/upload-artifact@v3
-      with:
-        name: test-results
-        path: ios-sdk/test-results.xcresult
-    
-    - name: Upload Framework
-      if: success()
-      uses: actions/upload-artifact@v3
-      with:
-        name: framework
-        path: ios-sdk/libs/AriseMobile.xcframework
-```
-
-### Performance Tips
-
-1. **Cache DerivedData** - Reuse compiled dependencies between builds
-2. **Pre-compile SourcePackages** - Commit pre-compiled packages to speed up CI
-3. **Parallel Jobs** - Run build and test in separate jobs for faster feedback
-4. **Incremental Builds** - Only rebuild changed files
-
-### Security Considerations
-
-- Never commit sensitive credentials to CI scripts
-- Use secrets management (GitHub Secrets, Jenkins Credentials)
-- Sign frameworks with proper certificates in CI
-- Validate code signing before distribution
+| Issue | Solution |
+|-------|----------|
+| Swift version mismatch | Use `runs-on: macos-15` for Xcode 16.4+ |
+| CloudCommerce not found | Commit `CloudCommerce.xcframework` to git |
+| Workflow doesn't trigger | Check changes are in `ios-sdk/` directory |
