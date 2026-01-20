@@ -253,13 +253,15 @@ echo ""
 # Use -onlyUsePackageVersionsFromResolvedFile to avoid re-resolving dependencies
 # Run tests sequentially to avoid issues with integration tests
 # Integration tests may have shared state or initialization issues with parallel execution
+# NOTE: Code coverage is disabled (-enableCodeCoverage NO) to avoid exit code 65 issues in CI
+# where all tests pass but xcodebuild reports failure due to coverage generation problems
 xcodebuild test \
   -project "$PROJECT_PATH" \
   -scheme "$SCHEME" \
   -configuration Debug \
   -destination "$DESTINATION" \
   -derivedDataPath "$DERIVED_DATA" \
-  -enableCodeCoverage YES \
+  -enableCodeCoverage NO \
   -resultBundlePath "$PROJECT_ROOT/test-results.xcresult" \
   -jobs 1 \
   -onlyUsePackageVersionsFromResolvedFile \

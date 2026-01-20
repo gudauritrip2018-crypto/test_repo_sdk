@@ -42,7 +42,7 @@
       selectedDebuggerIdentifier = "Xcode.DebuggerFoundation.Debugger.LLDB"
       selectedLauncherIdentifier = "Xcode.DebuggerFoundation.Launcher.LLDB"
       shouldUseLaunchSchemeArgsEnv = "YES"
-      codeCoverageEnabled = "YES"
+      codeCoverageEnabled = "NO"
       shouldAutocreateTestPlan = "YES">
       <MacroExpansion>
          <BuildableReference
@@ -53,15 +53,6 @@
             ReferencedContainer = "container:AriseMobileSdk.xcodeproj">
          </BuildableReference>
       </MacroExpansion>
-      <CodeCoverageTargets>
-         <BuildableReference
-            BuildableIdentifier = "primary"
-            BlueprintIdentifier = "DC25D2452EAF7A9B00F942C7"
-            BuildableName = "AriseMobile.framework"
-            BlueprintName = "AriseMobile"
-            ReferencedContainer = "container:AriseMobileSdk.xcodeproj">
-         </BuildableReference>
-      </CodeCoverageTargets>
       <Testables>
          <TestableReference
             skipped = "NO"

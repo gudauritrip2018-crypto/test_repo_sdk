@@ -654,6 +654,8 @@ run_tests() {
     echo ""
 
     # Run xcodebuild test
+    # NOTE: Code coverage is disabled (-enableCodeCoverage NO) to avoid exit code 65 issues in CI
+    # where all tests pass but xcodebuild reports failure due to coverage generation problems
     xcodebuild test \
         -project "$PROJECT_PATH" \
         -scheme "$SCHEME_NAME" \
@@ -664,6 +666,7 @@ run_tests() {
         $RESOLVE_FLAG \
         -skipPackagePluginValidation \
         -skipMacroValidation \
+        -enableCodeCoverage NO \
         -resultBundlePath "$PROJECT_ROOT/test-results.xcresult" \
         -parallel-testing-enabled NO \
         2>&1 | tee /tmp/test_output.log
