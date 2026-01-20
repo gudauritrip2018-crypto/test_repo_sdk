@@ -4,10 +4,10 @@ on:
   workflow_dispatch:
     inputs:
       release_notes_file:
-        description: 'Path to release notes file (default: ios-sdk/RELEASE_NOTES.md)'
+        description: 'Path to release notes file (leave empty to auto-generate from commits)'
         required: false
         type: string
-        default: 'ios-sdk/RELEASE_NOTES.md'
+        default: ''
       run_tests:
         description: 'Run tests before release'
         required: false
@@ -56,13 +56,19 @@ jobs:
           DIST_REPO_TOKEN: ${{ secrets.DISTRIBUTION_REPO_TOKEN }}
           DIST_REPO: ${{ secrets.DISTRIBUTION_REPO }}
         run: |
-          NOTES_FILE="${{ inputs.release_notes_file || 'ios-sdk/RELEASE_NOTES.md' }}"
+          NOTES_FILE="${{ inputs.release_notes_file }}"
 
-          if [ -f "$NOTES_FILE" ]; then
+          # Use file only if path is provided AND file exists AND has content
+          USE_FILE=false
+          if [ -n "$NOTES_FILE" ] && [ -f "$NOTES_FILE" ] && [ -s "$NOTES_FILE" ]; then
+            USE_FILE=true
+          fi
+
+          if [ "$USE_FILE" = true ]; then
             echo "Reading release notes from: $NOTES_FILE"
             CHANGELOG=$(cat "$NOTES_FILE")
           else
-            echo "File $NOTES_FILE not found, generating from commits since last release..."
+            echo "No release notes file provided or file is empty, generating from commits since last release..."
 
             # Find the last release tag from distribution repo
             LAST_TAG=""
