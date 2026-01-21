@@ -583,13 +583,14 @@ struct AriseMobileSdkPublicAPITests {
     
     @Test("AriseMobileSdk getPermissions delegates to SettingsService")
     func testGetPermissionsDelegatesToSettingsService() async throws {
-        let sdk = try createSDK()
         let mockSettingsService = MockSettingsService()
-        
-        // Create SDK with mocked SettingsService
+        let mockTTPService = MockTTPService()
+
+        // Create SDK with mocked SettingsService and TTPService
         let sdkWithMock = try AriseMobileSdk(
             environment: .uat,
-            settingsService: mockSettingsService
+            settingsService: mockSettingsService,
+            ttpService: mockTTPService
         )
         
         // Set up mock response
@@ -615,13 +616,14 @@ struct AriseMobileSdkPublicAPITests {
     
     @Test("AriseMobileSdk getPermissions handles errors from SettingsService")
     func testGetPermissionsHandlesErrors() async throws {
-        let sdk = try createSDK()
         let mockSettingsService = MockSettingsService()
-        
-        // Create SDK with mocked SettingsService
+        let mockTTPService = MockTTPService()
+
+        // Create SDK with mocked SettingsService and TTPService
         let sdkWithMock = try AriseMobileSdk(
             environment: .uat,
-            settingsService: mockSettingsService
+            settingsService: mockSettingsService,
+            ttpService: mockTTPService
         )
         
         // Set up mock error
@@ -638,13 +640,14 @@ struct AriseMobileSdkPublicAPITests {
     
     @Test("AriseMobileSdk getPermissions returns correct structure")
     func testGetPermissionsReturnsCorrectStructure() async throws {
-        let sdk = try createSDK()
         let mockSettingsService = MockSettingsService()
-        
-        // Create SDK with mocked SettingsService
+        let mockTTPService = MockTTPService()
+
+        // Create SDK with mocked SettingsService and TTPService
         let sdkWithMock = try AriseMobileSdk(
             environment: .uat,
-            settingsService: mockSettingsService
+            settingsService: mockSettingsService,
+            ttpService: mockTTPService
         )
         
         // Set up mock response with various permissions

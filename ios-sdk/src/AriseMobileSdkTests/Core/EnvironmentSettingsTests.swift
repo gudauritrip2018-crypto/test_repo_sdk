@@ -136,15 +136,15 @@ struct EnvironmentSettingsTests {
         let settings = EnvironmentSettings.production
         let profileId = settings.terminalProfileId
         #expect(!profileId.isEmpty)
-        #expect(profileId == "4c840000-0000-0000-05fe-bb5769610b25")
+        #expect(profileId == "4c840000-0000-0000-03c2-7fcd696e5616")
     }
-    
+
     @Test("UAT terminalProfileId is set")
     func testUatTerminalProfileId() {
         let settings = EnvironmentSettings.uat
         let profileId = settings.terminalProfileId
         #expect(!profileId.isEmpty)
-        #expect(profileId == "4c840000-0000-0000-05fe-bb5769610b25")
+        #expect(profileId == "4c840000-0000-0000-03c2-7fcd696e5616")
     }
     
     @Test("terminalProfileId is valid UUID format")

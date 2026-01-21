@@ -5,3 +5,4 @@ DerivedData-Tests-Local/
 test-results*.xcresult
 test-results-local.xcresult
 *.xcresult
+ios-sdk/src/AriseMobileSdk.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved
