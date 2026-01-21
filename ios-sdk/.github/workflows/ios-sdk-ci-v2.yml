@@ -1,0 +1,423 @@
+name: iOS SDK CI
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'ios-sdk/**'
+      - '.github/workflows/ios-sdk-ci-v2.yml'
+
+  workflow_dispatch:
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+      changelog: ${{ steps.changelog.outputs.changelog }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Calculate version
+        id: version
+        env:
+          DIST_REPO_TOKEN: ${{ secrets.DISTRIBUTION_REPO_TOKEN }}
+          DIST_REPO: ${{ secrets.DISTRIBUTION_REPO }}
+        run: |
+          echo "Fetching tags from distribution repository..."
+
+          REPO_URL="https://x-access-token:${DIST_REPO_TOKEN}@github.com/${DIST_REPO}.git"
+
+          ALL_TAGS=""
+          PRERELEASE_TAGS=""
+          if git clone --bare --filter=blob:none "$REPO_URL" dist-repo-tags 2>/dev/null; then
+            cd dist-repo-tags
+            ALL_TAGS=$(git tag -l "v*" | grep -v "pre-release" || echo "")
+            PRERELEASE_TAGS=$(git tag -l "v*-pre-release-*" || echo "")
+            cd ..
+            rm -rf dist-repo-tags
+          fi
+
+          echo "Production tags: ${ALL_TAGS:-none}"
+          echo "Pre-release tags: ${PRERELEASE_TAGS:-none}"
+
+          HIGHEST_PROD=$(echo "$ALL_TAGS" | sort -V | tail -1)
+          HIGHEST_PROD_VERSION=""
+          if [ -n "$HIGHEST_PROD" ]; then
+            HIGHEST_PROD_VERSION=$(echo "$HIGHEST_PROD" | sed 's/^v//')
+            echo "Highest production version: $HIGHEST_PROD_VERSION"
+          fi
+
+          PLIST_VERSION=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" ios-sdk/src/AriseMobileSdk/AriseMobileSdk-Info.plist 2>/dev/null || echo "1.0.0")
+          PLIST_MAJOR=$(echo $PLIST_VERSION | cut -d. -f1)
+          echo "Info.plist version: $PLIST_VERSION (major: $PLIST_MAJOR)"
+
+          if [ -n "$HIGHEST_PROD_VERSION" ]; then
+            PROD_MAJOR=$(echo "$HIGHEST_PROD_VERSION" | cut -d. -f1)
+
+            if [ "$PLIST_MAJOR" -gt "$PROD_MAJOR" ]; then
+              echo "Info.plist major ($PLIST_MAJOR) > production major ($PROD_MAJOR), using plist version"
+              BASE_VERSION="$PLIST_VERSION"
+            else
+              BASE_VERSION="$HIGHEST_PROD_VERSION"
+            fi
+          else
+            echo "No production tags found, using plist version"
+            BASE_VERSION="$PLIST_VERSION"
+          fi
+
+          echo "Base version for pre-release: $BASE_VERSION"
+
+          MATCHING_PRERELEASE=$(echo "$PRERELEASE_TAGS" | grep "^v${BASE_VERSION}-pre-release-" | sort -V | tail -1)
+
+          if [ -n "$MATCHING_PRERELEASE" ]; then
+            LAST_BUILD=$(echo "$MATCHING_PRERELEASE" | sed 's/.*-pre-release-//')
+            BUILD_NUMBER=$((LAST_BUILD + 1))
+            echo "Last pre-release for $BASE_VERSION: $MATCHING_PRERELEASE (build: $LAST_BUILD)"
+          else
+            BUILD_NUMBER=1
+            echo "No pre-releases for $BASE_VERSION, starting at build 1"
+          fi
+
+          VERSION="${BASE_VERSION}-pre-release-${BUILD_NUMBER}"
+          TAG="v${VERSION}"
+
+          echo "Final version: $VERSION"
+          echo "Tag: $TAG"
+
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+
+      - name: Generate changelog
+        id: changelog
+        env:
+          DIST_REPO_TOKEN: ${{ secrets.DISTRIBUTION_REPO_TOKEN }}
+          DIST_REPO: ${{ secrets.DISTRIBUTION_REPO }}
+        run: |
+          echo "Generating changelog..."
+
+          REPO_URL="https://x-access-token:${DIST_REPO_TOKEN}@github.com/${DIST_REPO}.git"
+
+          PREV_TAG=""
+          PREV_TAG_DATE=""
+
+          if git clone --bare --filter=blob:none "$REPO_URL" dist-repo-changelog 2>/dev/null; then
+            cd dist-repo-changelog
+            PREV_TAG=$(git tag -l "v*-pre-release-*" | sort -V | tail -1)
+
+            if [ -n "$PREV_TAG" ]; then
+              PREV_TAG_DATE=$(git log -1 --format="%ci" "$PREV_TAG" 2>/dev/null || echo "")
+            fi
+            cd ..
+            rm -rf dist-repo-changelog
+          fi
+
+          echo "Previous tag: ${PREV_TAG:-none}"
+          echo "Previous tag date: ${PREV_TAG_DATE:-none}"
+
+          if [ -n "$PREV_TAG_DATE" ]; then
+            echo "Getting commits since: $PREV_TAG_DATE"
+            CHANGELOG=$(git log --since="$PREV_TAG_DATE" --pretty=format:"- %s (%h)" --no-merges -- ios-sdk/ | head -30)
+          else
+            echo "No previous tag found, getting recent commits"
+            CHANGELOG=$(git log --pretty=format:"- %s (%h)" --no-merges -- ios-sdk/ -10)
+          fi
+
+          if [ -z "$CHANGELOG" ]; then
+            CHANGELOG="- Initial release"
+          fi
+
+          echo "Changelog:"
+          echo "$CHANGELOG"
+
+          echo "changelog<<EOF" >> $GITHUB_OUTPUT
+          echo "$CHANGELOG" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+  test:
+    needs: setup
+    runs-on: macos-15
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Cache for Tests
+        uses: actions/cache@v4
+        with:
+          path: |
+            ios-sdk/DerivedData-Tests
+            ios-sdk/SourcePackages
+            ~/Library/Caches/org.swift.swiftpm
+          key: ${{ runner.os }}-test-v2-${{ hashFiles('ios-sdk/src/AriseMobileSdk.xcodeproj/project.pbxproj') }}
+          restore-keys: |
+            ${{ runner.os }}-test-v2-
+
+      - name: Boot Simulator
+        run: |
+          SIMULATOR_ID=$(xcrun simctl list devices available | grep "iPhone" | head -1 | sed 's/.*(\([A-F0-9-]*\)).*/\1/')
+          xcrun simctl boot "$SIMULATOR_ID" 2>/dev/null || true
+          echo "Simulator ready"
+
+      - name: Run Tests
+        run: |
+          cd ios-sdk/libs
+          chmod +x build_and_test_ci.sh
+          ./build_and_test_ci.sh test
+
+      - name: Upload Test Results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: ios-sdk/test-results.xcresult
+          retention-days: 30
+          if-no-files-found: warn
+
+  build:
+    needs: setup
+    runs-on: macos-15
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Cache for Build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ios-sdk/libs/Build
+            ios-sdk/SourcePackages
+            ~/Library/Caches/org.swift.swiftpm
+          key: ${{ runner.os }}-build-v2-${{ hashFiles('ios-sdk/src/AriseMobileSdk.xcodeproj/project.pbxproj') }}
+          restore-keys: |
+            ${{ runner.os }}-build-v2-
+
+      - name: Build XCFramework
+        env:
+          MARKETING_VERSION: ${{ needs.setup.outputs.version }}
+          BUILD_NUMBER: ${{ github.run_number }}
+        run: |
+          cd ios-sdk/libs
+          chmod +x build_and_test_ci.sh
+          echo "Building with version: ${MARKETING_VERSION} (build ${BUILD_NUMBER})"
+          ./build_and_test_ci.sh build
+          echo "Framework built"
+
+      - name: Prepare Distribution
+        run: |
+          mkdir -p ios-sdk/Distribution/libs
+
+          if [ -d "ios-sdk/libs/AriseMobile.xcframework" ]; then
+            cp -R ios-sdk/libs/AriseMobile.xcframework ios-sdk/Distribution/libs/
+          fi
+
+          if [ -d "ios-sdk/libs/CloudCommerce.xcframework" ]; then
+            cp -R ios-sdk/libs/CloudCommerce.xcframework ios-sdk/Distribution/libs/
+          fi
+
+          echo "Frameworks prepared"
+          ls -lh ios-sdk/Distribution/libs/
+
+      - name: Create Archive
+        run: |
+          cd ios-sdk/Distribution
+          VERSION="${{ needs.setup.outputs.version }}"
+          ARCHIVE="AriseMobileSdk-v${VERSION}-xcframeworks.zip"
+          zip -r "$ARCHIVE" libs/
+          echo "Archive: $ARCHIVE"
+
+      - name: Upload Build Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-sdk-build
+          path: ios-sdk/Distribution/
+          retention-days: 1
+
+  release:
+    needs: [setup, test, build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Download Build Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ios-sdk-build
+          path: distribution-files/
+
+      - name: Setup Distribution Repository
+        run: |
+          REPO_URL="https://x-access-token:${{ secrets.DISTRIBUTION_REPO_TOKEN }}@github.com/${{ secrets.DISTRIBUTION_REPO }}.git"
+
+          git clone --depth=1 "$REPO_URL" distribution-repo 2>/dev/null || {
+            mkdir distribution-repo
+            cd distribution-repo
+            git init
+            git remote add origin "$REPO_URL"
+            git checkout -b main
+          }
+
+          cd distribution-repo
+          git fetch origin --tags 2>/dev/null || true
+          git checkout main 2>/dev/null || git checkout -b main
+
+      - name: Configure Git
+        working-directory: distribution-repo
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Copy Files
+        run: |
+          cp distribution-files/Package.swift distribution-repo/ 2>/dev/null || true
+          cp distribution-files/README.md distribution-repo/ 2>/dev/null || true
+
+          mkdir -p distribution-repo/Sources
+          cp -R distribution-files/Sources/* distribution-repo/Sources/ 2>/dev/null || true
+
+          mkdir -p distribution-repo/libs
+          rm -rf distribution-repo/libs/*
+          cp -R distribution-files/libs/* distribution-repo/libs/
+
+          echo "Files copied"
+
+      - name: Commit and Push
+        working-directory: distribution-repo
+        run: |
+          git add .
+
+          if git diff --staged --quiet; then
+            echo "No changes"
+          else
+            VERSION="${{ needs.setup.outputs.version }}"
+            git commit -m "Pre-release v${VERSION}"
+            git push -u origin main
+            echo "Pushed"
+          fi
+
+      - name: Create Tag
+        working-directory: distribution-repo
+        run: |
+          TAG="${{ needs.setup.outputs.tag }}"
+
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            git tag -d "$TAG"
+          fi
+
+          if git ls-remote --tags origin "refs/tags/${TAG}" | grep -q .; then
+            echo "Tag $TAG already exists remotely, skipping"
+          else
+            git tag -a "$TAG" -m "Pre-release $TAG"
+            git push origin "$TAG"
+            echo "Tag $TAG created"
+          fi
+
+      - name: Find Archive
+        id: archive
+        run: |
+          ARCHIVE=$(ls distribution-files/*.zip 2>/dev/null | head -1)
+          echo "path=$ARCHIVE" >> $GITHUB_OUTPUT
+          echo "Archive: $ARCHIVE"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          repository: ${{ secrets.DISTRIBUTION_REPO }}
+          token: ${{ secrets.DISTRIBUTION_REPO_TOKEN }}
+          tag_name: ${{ needs.setup.outputs.tag }}
+          name: AriseMobileSdk ${{ needs.setup.outputs.tag }}
+          prerelease: true
+          body: |
+            ## AriseMobileSdk ${{ needs.setup.outputs.tag }}
+
+            **Type:** Pre-release
+
+            ### Changes
+
+            ${{ needs.setup.outputs.changelog }}
+
+            ### Installation
+
+            ```swift
+            .package(url: "https://github.com/${{ secrets.DISTRIBUTION_REPO }}.git", exact: "${{ needs.setup.outputs.version }}")
+            ```
+          files: ${{ steps.archive.outputs.path }}
+          draft: false
+
+      - name: Cleanup Old Pre-releases
+        env:
+          GH_TOKEN: ${{ secrets.DISTRIBUTION_REPO_TOKEN }}
+        run: |
+          echo "Cleaning up old pre-releases (keeping last 5)..."
+
+          echo "Fetching releases from ${{ secrets.DISTRIBUTION_REPO }}..."
+          RAW_RELEASES=$(gh release list --repo "${{ secrets.DISTRIBUTION_REPO }}" --limit 100 --json tagName,isPrerelease,createdAt 2>&1) || {
+            echo "Failed to fetch releases: $RAW_RELEASES"
+            exit 0
+          }
+
+          echo "Raw releases:"
+          echo "$RAW_RELEASES" | head -20
+
+          # Get ALL pre-releases (by isPrerelease flag), sorted by date (oldest first)
+          RELEASES=$(echo "$RAW_RELEASES" | jq -r '.[] | select(.isPrerelease == true) | .tagName + " " + .createdAt' | sort -k2 | awk '{print $1}')
+
+          if [ -z "$RELEASES" ]; then
+            echo "No pre-releases found"
+            exit 0
+          fi
+
+          echo "Pre-releases found (oldest first):"
+          echo "$RELEASES"
+
+          COUNT=$(echo "$RELEASES" | wc -l | tr -d ' ')
+          echo "Total count: $COUNT"
+
+          if [ "$COUNT" -gt 5 ]; then
+            DELETE_COUNT=$((COUNT - 5))
+            echo "Deleting $DELETE_COUNT oldest pre-releases..."
+
+            TO_DELETE=$(echo "$RELEASES" | head -n $DELETE_COUNT)
+
+            for TAG in $TO_DELETE; do
+              echo "Deleting release: $TAG"
+              gh release delete "$TAG" --repo "${{ secrets.DISTRIBUTION_REPO }}" --yes --cleanup-tag || {
+                echo "Failed to delete release $TAG, trying alternative..."
+                gh release delete "$TAG" --repo "${{ secrets.DISTRIBUTION_REPO }}" --yes || true
+                gh api --method DELETE "/repos/${{ secrets.DISTRIBUTION_REPO }}/git/refs/tags/$TAG" || true
+              }
+            done
+
+            echo "Cleanup complete"
+          else
+            echo "No cleanup needed (have $COUNT, keeping 5)"
+          fi
+
+      - name: Summary
+        run: |
+          echo "## Release Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Property | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Version | ${{ needs.setup.outputs.version }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Tag | ${{ needs.setup.outputs.tag }} |" >> $GITHUB_STEP_SUMMARY

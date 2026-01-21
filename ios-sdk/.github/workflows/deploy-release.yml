@@ -1,0 +1,351 @@
+name: Deploy iOS SDK Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_notes_file:
+        description: 'Path to release notes file (leave empty to auto-generate from commits)'
+        required: false
+        type: string
+        default: ''
+      run_tests:
+        description: 'Run tests before release'
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+      changelog: ${{ steps.changelog.outputs.changelog }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Extract version from branch name
+        id: version
+        run: |
+          BRANCH="${{ github.ref_name }}"
+          echo "Branch: $BRANCH"
+
+          if [[ "$BRANCH" =~ ^release/([0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
+            VERSION="${BASH_REMATCH[1]}"
+            TAG="v${VERSION}"
+
+            echo "Version: $VERSION"
+            echo "Tag: $TAG"
+
+            echo "version=$VERSION" >> $GITHUB_OUTPUT
+            echo "tag=$TAG" >> $GITHUB_OUTPUT
+          else
+            echo "Error: Branch name must be in format 'release/X.Y.Z'"
+            echo "Current branch: $BRANCH"
+            exit 1
+          fi
+
+      - name: Generate changelog
+        id: changelog
+        env:
+          DIST_REPO_TOKEN: ${{ secrets.DISTRIBUTION_REPO_TOKEN }}
+          DIST_REPO: ${{ secrets.DISTRIBUTION_REPO }}
+        run: |
+          NOTES_FILE="${{ inputs.release_notes_file }}"
+
+          # Use file only if path is provided AND file exists AND has content
+          USE_FILE=false
+          if [ -n "$NOTES_FILE" ] && [ -f "$NOTES_FILE" ] && [ -s "$NOTES_FILE" ]; then
+            USE_FILE=true
+          fi
+
+          if [ "$USE_FILE" = true ]; then
+            echo "Reading release notes from: $NOTES_FILE"
+            CHANGELOG=$(cat "$NOTES_FILE")
+          else
+            echo "No release notes file provided or file is empty, generating from commits since last release..."
+
+            # Find the last release tag from distribution repo
+            LAST_TAG=""
+            if git clone --bare --filter=blob:none "https://x-access-token:${DIST_REPO_TOKEN}@github.com/${DIST_REPO}.git" dist-repo-tags 2>/dev/null; then
+              cd dist-repo-tags
+              # Get production tags (exclude pre-release), sort by version, get the latest
+              LAST_TAG=$(git tag -l "v*" | grep -v "pre-release" | sort -V | tail -1)
+              cd ..
+              rm -rf dist-repo-tags
+            fi
+
+            if [ -n "$LAST_TAG" ]; then
+              echo "Last release tag: $LAST_TAG"
+              # Find the commit date of the last tag in distribution repo
+              # and get commits since that date in this repo
+              LAST_TAG_DATE=$(git clone --bare --filter=blob:none "https://x-access-token:${DIST_REPO_TOKEN}@github.com/${DIST_REPO}.git" dist-repo-date 2>/dev/null && cd dist-repo-date && git log -1 --format="%ci" "$LAST_TAG" 2>/dev/null && cd .. && rm -rf dist-repo-date || echo "")
+
+              if [ -n "$LAST_TAG_DATE" ]; then
+                echo "Last release date: $LAST_TAG_DATE"
+                CHANGELOG=$(git log --since="$LAST_TAG_DATE" --pretty=format:"- %s (%h)" --no-merges -- ios-sdk/)
+              else
+                echo "Could not get last tag date, using last 20 commits"
+                CHANGELOG=$(git log --pretty=format:"- %s (%h)" --no-merges -- ios-sdk/ -20)
+              fi
+            else
+              echo "No previous release tags found, using last 20 commits"
+              CHANGELOG=$(git log --pretty=format:"- %s (%h)" --no-merges -- ios-sdk/ -20)
+            fi
+
+            if [ -z "$CHANGELOG" ]; then
+              CHANGELOG="- Release ${{ steps.version.outputs.version }}"
+            fi
+          fi
+
+          echo "Changelog:"
+          echo "$CHANGELOG"
+
+          echo "changelog<<EOF" >> $GITHUB_OUTPUT
+          echo "$CHANGELOG" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+  test:
+    needs: setup
+    if: inputs.run_tests == true
+    runs-on: macos-15
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Cache for Tests
+        uses: actions/cache@v4
+        with:
+          path: |
+            ios-sdk/DerivedData-Tests
+            ios-sdk/SourcePackages
+            ~/Library/Caches/org.swift.swiftpm
+          key: ${{ runner.os }}-test-v2-${{ hashFiles('ios-sdk/src/AriseMobileSdk.xcodeproj/project.pbxproj') }}
+          restore-keys: |
+            ${{ runner.os }}-test-v2-
+
+      - name: Boot Simulator
+        run: |
+          SIMULATOR_ID=$(xcrun simctl list devices available | grep "iPhone" | head -1 | sed 's/.*(\([A-F0-9-]*\)).*/\1/')
+          xcrun simctl boot "$SIMULATOR_ID" 2>/dev/null || true
+          echo "Simulator ready"
+
+      - name: Run Tests
+        run: |
+          cd ios-sdk/libs
+          chmod +x build_and_test_ci.sh
+          ./build_and_test_ci.sh test
+
+      - name: Upload Test Results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: ios-sdk/test-results.xcresult
+          retention-days: 30
+          if-no-files-found: warn
+
+  build:
+    needs: setup
+    runs-on: macos-15
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Cache for Build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ios-sdk/libs/Build
+            ios-sdk/SourcePackages
+            ~/Library/Caches/org.swift.swiftpm
+          key: ${{ runner.os }}-build-v2-${{ hashFiles('ios-sdk/src/AriseMobileSdk.xcodeproj/project.pbxproj') }}
+          restore-keys: |
+            ${{ runner.os }}-build-v2-
+
+      - name: Build XCFramework
+        env:
+          MARKETING_VERSION: ${{ needs.setup.outputs.version }}
+          BUILD_NUMBER: ${{ github.run_number }}
+        run: |
+          cd ios-sdk/libs
+          chmod +x build_and_test_ci.sh
+          echo "Building with version: ${MARKETING_VERSION}"
+          ./build_and_test_ci.sh build
+          echo "Framework built"
+
+      - name: Prepare Distribution
+        run: |
+          mkdir -p ios-sdk/Distribution/libs
+
+          if [ -d "ios-sdk/libs/AriseMobile.xcframework" ]; then
+            cp -R ios-sdk/libs/AriseMobile.xcframework ios-sdk/Distribution/libs/
+          fi
+
+          if [ -d "ios-sdk/libs/CloudCommerce.xcframework" ]; then
+            cp -R ios-sdk/libs/CloudCommerce.xcframework ios-sdk/Distribution/libs/
+          fi
+
+          echo "Frameworks prepared"
+          ls -lh ios-sdk/Distribution/libs/
+
+      - name: Create Archive
+        run: |
+          cd ios-sdk/Distribution
+          VERSION="${{ needs.setup.outputs.version }}"
+          ARCHIVE="AriseMobileSdk-v${VERSION}-xcframeworks.zip"
+          zip -r "$ARCHIVE" libs/
+          echo "Archive: $ARCHIVE"
+
+      - name: Upload Build Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-sdk-build
+          path: ios-sdk/Distribution/
+          retention-days: 1
+
+  release:
+    needs: [setup, test, build]
+    if: always() && needs.setup.result == 'success' && needs.build.result == 'success' && (needs.test.result == 'success' || needs.test.result == 'skipped')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Download Build Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ios-sdk-build
+          path: distribution-files/
+
+      - name: Setup Distribution Repository
+        run: |
+          REPO_URL="https://x-access-token:${{ secrets.DISTRIBUTION_REPO_TOKEN }}@github.com/${{ secrets.DISTRIBUTION_REPO }}.git"
+
+          git clone "$REPO_URL" distribution-repo 2>/dev/null || {
+            mkdir distribution-repo
+            cd distribution-repo
+            git init
+            git remote add origin "$REPO_URL"
+          }
+
+          cd distribution-repo
+          git fetch origin --tags 2>/dev/null || true
+
+          if git ls-remote --heads origin release | grep -q release; then
+            git checkout release
+            git pull origin release
+          else
+            git checkout -b release
+          fi
+
+      - name: Configure Git
+        working-directory: distribution-repo
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Copy Files
+        run: |
+          cp distribution-files/Package.swift distribution-repo/ 2>/dev/null || true
+          cp distribution-files/README.md distribution-repo/ 2>/dev/null || true
+
+          mkdir -p distribution-repo/Sources
+          cp -R distribution-files/Sources/* distribution-repo/Sources/ 2>/dev/null || true
+
+          mkdir -p distribution-repo/libs
+          rm -rf distribution-repo/libs/*
+          cp -R distribution-files/libs/* distribution-repo/libs/
+
+          echo "Files copied"
+
+      - name: Commit and Push
+        working-directory: distribution-repo
+        run: |
+          git add .
+
+          if git diff --staged --quiet; then
+            echo "No changes"
+          else
+            VERSION="${{ needs.setup.outputs.version }}"
+            git commit -m "Release v${VERSION}"
+            git push -u origin release
+            echo "Pushed to release branch"
+          fi
+
+      - name: Create Tag
+        working-directory: distribution-repo
+        run: |
+          TAG="${{ needs.setup.outputs.tag }}"
+
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            git tag -d "$TAG"
+          fi
+
+          if git ls-remote --tags origin "refs/tags/${TAG}" | grep -q .; then
+            echo "Tag $TAG already exists remotely, skipping"
+          else
+            git tag -a "$TAG" -m "Release $TAG"
+            git push origin "$TAG"
+            echo "Tag $TAG created"
+          fi
+
+      - name: Find Archive
+        id: archive
+        run: |
+          ARCHIVE=$(ls distribution-files/*.zip 2>/dev/null | head -1)
+          echo "path=$ARCHIVE" >> $GITHUB_OUTPUT
+          echo "Archive: $ARCHIVE"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          repository: ${{ secrets.DISTRIBUTION_REPO }}
+          token: ${{ secrets.DISTRIBUTION_REPO_TOKEN }}
+          tag_name: ${{ needs.setup.outputs.tag }}
+          name: AriseMobileSdk ${{ needs.setup.outputs.tag }}
+          prerelease: false
+          body: |
+            ## AriseMobileSdk ${{ needs.setup.outputs.tag }}
+
+            **Type:** Production Release
+
+            ### Changes
+
+            ${{ needs.setup.outputs.changelog }}
+
+            ### Installation
+
+            ```swift
+            .package(url: "https://github.com/${{ secrets.DISTRIBUTION_REPO }}.git", from: "${{ needs.setup.outputs.version }}")
+            ```
+          files: ${{ steps.archive.outputs.path }}
+          draft: false
+
+      - name: Summary
+        run: |
+          echo "## Release Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Property | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Version | ${{ needs.setup.outputs.version }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Tag | ${{ needs.setup.outputs.tag }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Branch | release |" >> $GITHUB_STEP_SUMMARY
