@@ -31,7 +31,9 @@ struct AuthTransactionView: View {
     @State private var selectedTransactionId: String?
     
     // Required fields
-    @State private var paymentProcessorId: String = "ad830b7f-d21c-4173-90bd-0e090da31072"
+    @State private var paymentProcessorId: String = ""
+    @State private var isLoadingPaymentProcessor: Bool = false
+    
     @State private var amount: String = "100.00"
     @State private var currencyId: String = "1" // USD
     @State private var cardDataSourceValue: String = "\(CardDataSource.manual.rawValue)" // Manual entry
@@ -100,10 +102,16 @@ struct AuthTransactionView: View {
                         HStack {
                             Text("Payment Processor ID:")
                                 .frame(width: 150, alignment: .leading)
-                            TextField("UUID", text: $paymentProcessorId)
-                                .textFieldStyle(.roundedBorder)
-                                .autocapitalization(.none)
-                                .disableAutocorrection(true)
+                            HStack {
+                                if isLoadingPaymentProcessor {
+                                    ProgressView()
+                                        .scaleEffect(0.7)
+                                }
+                                TextField("UUID", text: $paymentProcessorId)
+                                    .textFieldStyle(.roundedBorder)
+                                    .autocapitalization(.none)
+                                    .disableAutocorrection(true)
+                            }
                         }
                         
                         HStack {
@@ -575,6 +583,7 @@ struct AuthTransactionView: View {
         .scrollDismissesKeyboard(.interactively)
         .onAppear {
             initializeSdkIfNeeded()
+            loadPaymentProcessorId()
         }
         .onChange(of: amount) { _ in handleCalculationInputChanged() }
         .onChange(of: tipAmount) { _ in handleCalculationInputChanged() }
@@ -606,6 +615,33 @@ struct AuthTransactionView: View {
 
     private var isCalculationReady: Bool {
         calculationResult != nil && calculationErrorMessage.isEmpty
+    }
+    
+    private func loadPaymentProcessorId() {
+        guard let ariseSdk = ariseSdk, !isLoadingPaymentProcessor else { return }
+        
+        isLoadingPaymentProcessor = true
+        
+        Task {
+            do {
+                let settings = try await ariseSdk.getPaymentSettings()
+                // Get first payment processor or default one
+                let processor = settings.availablePaymentProcessors.first { $0.isDefault == true } 
+                    ?? settings.availablePaymentProcessors.first
+                
+                await MainActor.run {
+                    if let processorId = processor?.id {
+                        self.paymentProcessorId = processorId
+                    }
+                    self.isLoadingPaymentProcessor = false
+                }
+            } catch {
+                await MainActor.run {
+                    self.isLoadingPaymentProcessor = false
+                    // Keep existing value if loading fails
+                }
+            }
+        }
     }
     
     private func initializeSdkIfNeeded() {

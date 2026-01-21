@@ -49,9 +49,9 @@ internal enum EnvironmentSettings {
         case .production:
             // TODO: Update this value once Production environment is configured
             // This is currently using the Sandbox/MTF TerminalProfileId
-            return "4c840000-0000-0000-05fe-bb5769610b25"
+            return "4c840000-0000-0000-03c2-7fcd696e5616"
         case .uat:
-            return "4c840000-0000-0000-05fe-bb5769610b25"
+            return "4c840000-0000-0000-03c2-7fcd696e5616"
         }
     }
 }

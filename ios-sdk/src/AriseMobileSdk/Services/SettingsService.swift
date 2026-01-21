@@ -23,5 +23,19 @@ class SettingsService: BaseApiClient, SettingsServiceProtocol, @unchecked Sendab
             throw error
         }
     }
+    
+    func getPermissions() async throws -> ApiPermissionsResponse {
+        let client = try getApiClient()
+        
+        do {
+            let generatedResult = try await client.getApiAvailableApiPermissions(.init())
+            let result = try ApiPermissionsResponseMapper.toModel(generatedResult)
+            
+            return result
+        } catch {
+            try DecodingErrorHandler().handleError(error)
+            throw error
+        }
+    }
 }
 

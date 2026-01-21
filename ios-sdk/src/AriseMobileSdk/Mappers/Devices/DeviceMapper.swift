@@ -5,7 +5,7 @@ import Foundation
 struct DeviceMapper {
     
     static func toModel(
-        _ generated: Components.Schemas.PaymentGateway_Contracts_PublicApi_Isv_Devices_Get_DeviceResponse
+        _ generated: Components.Schemas.DeviceResponseDto
     ) throws -> DeviceInfo {
         
         guard let deviceId = generated.deviceId, !deviceId.isEmpty else {

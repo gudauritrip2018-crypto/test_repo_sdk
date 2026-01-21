@@ -5,8 +5,8 @@ struct AuthorizationTransactionMapper {
     /// Map SDK's payment transaction request to OpenAPI generated authorization input
     /// - Parameter input: SDK's payment transaction input
     /// - Returns: Generated API request format
-    static func toGeneratedInput(_ input: AuthorizationRequest) -> Components.Schemas.PaymentGateway_Contracts_PublicApi_Isv_Transactions_Authorization_IsvAuthorizationRequest {
-        let request = Components.Schemas.PaymentGateway_Contracts_PublicApi_Isv_Transactions_Authorization_IsvAuthorizationRequest(
+    static func toGeneratedInput(_ input: AuthorizationRequest) -> Components.Schemas.AuthorizationRequestDto {
+        let request = Components.Schemas.AuthorizationRequestDto(
             paymentProcessorId: input.paymentProcessorId,
             customerId: input.customerId,
             paymentMethodId: input.paymentMethodId,
@@ -52,7 +52,7 @@ struct AuthorizationTransactionMapper {
         return toModel(responseBody)
     }
     
-    static func toModel(_ response: Components.Schemas.PaymentGateway_Contracts_PublicApi_Isv_Transactions_Authorization_IsvAuthorizationResponse) -> AuthorizationResponse {
+    static func toModel(_ response: Components.Schemas.AuthorizationResponseDto) -> AuthorizationResponse {
         return AuthorizationResponse(
             transactionId: response.transactionId,
             transactionDateTime: response.transactionDateTime,

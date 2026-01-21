@@ -5,7 +5,7 @@ struct TransactionSummaryMapper{
     /// - Parameter item: Transaction item from generated OpenAPI client
     /// - Returns: TransactionSummary in SDK format, or nil if required fields are missing
     public static func toModel(
-        _ item: Components.Schemas.PaymentGateway_Contracts_PublicApi_Isv_Transactions_GetPage_GetIsvTransactionsResponse
+        _ item: Components.Schemas.GetIsvTransactionsResponseDto
     ) -> TransactionSummary? {
         // Validate required fields - id and merchantId are required
         guard let id = item.id, !id.isEmpty else {

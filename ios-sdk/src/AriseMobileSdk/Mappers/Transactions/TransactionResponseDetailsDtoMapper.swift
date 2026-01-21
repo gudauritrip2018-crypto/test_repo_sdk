@@ -1,7 +1,7 @@
 struct TransactionResponseDetailsDtoMapper {
     
     /// Map transaction response details DTO from OpenAPI format to SDK format
-    static func toModel(_ details: Components.Schemas.PaymentGateway_Contracts_Transactions_TransactionResponseDetailsDto) -> TransactionResponseDetailsDto {
+    static func toModel(_ details: Components.Schemas.TransactionResponseDetailsIsvDto) -> TransactionResponseDetailsDto {
         return TransactionResponseDetailsDto(
             hostResponseCode: details.hostResponseCode,
             hostResponseMessage: details.hostResponseMessage,

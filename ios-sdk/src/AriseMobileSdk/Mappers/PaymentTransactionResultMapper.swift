@@ -7,7 +7,7 @@
 
 import Foundation
 
-typealias GeneratedIsvAuthorizationResponse = Components.Schemas.PaymentGateway_Contracts_PublicApi_Isv_Transactions_Authorization_IsvAuthorizationResponse
+typealias GeneratedIsvAuthorizationResponse = Components.Schemas.AuthorizationResponseDto
 typealias IsvAuthorizationResult = AuthorizationResponse
 
 internal struct IsvAuthorizationResultMapper {

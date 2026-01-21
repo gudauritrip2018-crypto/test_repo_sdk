@@ -1,8 +1,6 @@
 import Foundation
 
-// swiftlint:disable line_length
-typealias GeneratedIsvTransactionResponse = Components.Schemas.PaymentGateway_Contracts_PublicApi_Isv_Transactions_IsvTransactionResponse
-// swiftlint:enable line_length
+typealias GeneratedIsvTransactionResponse = Components.Schemas.TransactionResponseIsvDto
 
 /// Mapper that converts OpenAPI-generated ISV transaction responses into SDK models.
 internal struct TransactionResponseMapper {

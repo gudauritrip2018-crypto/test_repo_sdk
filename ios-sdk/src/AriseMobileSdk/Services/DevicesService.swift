@@ -55,7 +55,7 @@ final class DevicesService: BaseApiClient, DevicesServiceProtocol, @unchecked Se
         _logger.debug("Registering device: \(deviceName) (ID: \(deviceId))")
         
         // Create request body
-        let requestBody = Components.Schemas.PaymentGateway_Contracts_PublicApi_Isv_Devices_CreateOrUpdate_CreateOrUpdateDeviceRequest(
+        let requestBody = Components.Schemas.CreateOrUpdateIsvDeviceRequestDto(
             deviceId: deviceId,
             deviceName: deviceName
         )
@@ -90,7 +90,7 @@ final class DevicesService: BaseApiClient, DevicesServiceProtocol, @unchecked Se
         _logger.verbose("Generating TTP JWT for device: \(deviceId)")
         
         // Create request body
-        let requestBody = Components.Schemas.PaymentGateway_Contracts_PublicApi_Isv_Devices_TapToPay_GenerateTapToPayJwtRequest(
+        let requestBody = Components.Schemas.GenerateIsvTapToPayJwtRequestDto(
             deviceId: deviceId.lowercased()
         )
         

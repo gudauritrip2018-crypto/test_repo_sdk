@@ -2,8 +2,8 @@ import Foundation
 
 internal struct SaleTransactionMapper {
     /// Map SDK sale request to generated OpenAPI request
-    static func toGeneratedInput(_ input: AuthorizationRequest) -> Components.Schemas.PaymentGateway_Contracts_PublicApi_Isv_Transactions_Sale_IsvSaleRequest {
-        return Components.Schemas.PaymentGateway_Contracts_PublicApi_Isv_Transactions_Sale_IsvSaleRequest(
+    static func toGeneratedInput(_ input: AuthorizationRequest) -> Components.Schemas.SaleRequestDto {
+        return Components.Schemas.SaleRequestDto(
             paymentProcessorId: input.paymentProcessorId,
             customerId: input.customerId,
             paymentMethodId: input.paymentMethodId,

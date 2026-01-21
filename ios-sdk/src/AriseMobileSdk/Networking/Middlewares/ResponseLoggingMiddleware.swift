@@ -44,25 +44,14 @@ internal struct ResponseLoggingMiddleware: ClientMiddleware, @unchecked Sendable
         logger.verbose("Operation: \(operationID)")
         logger.verbose("Status Code: \(response.status.code)")
         logger.verbose("Headers: \(response.headerFields)")
-        
-        // CRITICAL: Do NOT read response body to avoid fatal "wroteFinalChunk()" errors.
-        // Reading HTTPBody streams can cause fatal errors if the stream is already closed
-        // or has been consumed. The body stream can only be read once.
-        // 
-        // For error responses: ErrorHandlingMiddleware will use data from buffer if available
-        // (e.g., from tests that pre-populate the buffer). If buffer is empty, it will create
-        // a generic error message.
-        // For successful responses: The body should be consumed by the client code, not middleware.
-        
         logger.verbose("Response Body: (not read to avoid fatal stream errors)")
         logger.verbose("Note: Response body streams can only be read once and must be consumed by client code.")
-        
-        // Set buffer to nil - we're not reading the body here
-        await responseBodyBuffer.set(operationID: operationID, data: nil)
-        
         logger.verbose("═══════════════════════════════════════════════════")
 
-        // Return original body unchanged - let client code consume it
+        // Store nil in buffer (body not read to avoid stream errors)
+        await responseBodyBuffer.set(operationID: operationID, data: nil)
+
+        // Return response with original body
         return (response, responseBody)
     }
 }

@@ -2,8 +2,8 @@ import Foundation
 
 internal struct TransactionProductMapper {
     /// Map SDK's TransactionProduct to OpenAPI generated TransactionProductDto
-    static func toGeneratedInput(_ input: TransactionProduct) -> Components.Schemas.PaymentGateway_Contracts_Transactions_TransactionProductDto {
-        return Components.Schemas.PaymentGateway_Contracts_Transactions_TransactionProductDto(
+    static func toGeneratedInput(_ input: TransactionProduct) -> Components.Schemas.TransactionProductIsvDto {
+        return Components.Schemas.TransactionProductIsvDto(
             name: input.name,
             code: input.code,
             unitPrice: input.unitPrice,

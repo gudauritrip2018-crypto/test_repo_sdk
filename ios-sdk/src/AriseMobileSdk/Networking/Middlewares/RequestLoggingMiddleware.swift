@@ -39,17 +39,37 @@ internal struct RequestLoggingMiddleware: ClientMiddleware, @unchecked Sendable 
             logger.verbose(headersString.trimmingCharacters(in: .whitespacesAndNewlines))
         }
         
-        if body != nil {
-            logger.verbose("📦 Body: (present, not read to avoid stream errors)")
+        let bodyToPass: HTTPBody?
+        if let body = body {
+            do {
+                // Try to read body data for logging
+                // HTTPBody returns ArraySlice<UInt8> chunks
+                var bodyData = Data()
+                for try await chunk in body {
+                    bodyData.append(contentsOf: chunk)
+                }
+                
+                if let bodyString = String(data: bodyData, encoding: .utf8) {
+                    logger.verbose("📦 Body: \(bodyString)")
+                } else {
+                    logger.verbose("📦 Body: (binary data, \(bodyData.count) bytes)")
+                }
+                
+                // Recreate body from data to pass through
+                bodyToPass = HTTPBody(bodyData)
+            } catch {
+                logger.verbose("📦 Body: (error reading body: \(error.localizedDescription))")
+                bodyToPass = body
+            }
         } else {
             logger.verbose("📦 Body: (nil)")
+            bodyToPass = nil
         }
         
         logger.verbose("═══════════════════════════════════════════════════")
         
-        // Pass body through unchanged - let OpenAPI client handle it
-        // This avoids any interference with the bidirectional streaming mechanism
-        return try await next(request, body, baseURL)
+        // Pass body through (recreated if it was read for logging)
+        return try await next(request, bodyToPass, baseURL)
     }
 }
 

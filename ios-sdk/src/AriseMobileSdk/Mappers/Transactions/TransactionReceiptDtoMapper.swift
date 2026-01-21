@@ -1,7 +1,7 @@
 struct TransactionReceiptDtoMapper {
     
     /// Map transaction receipt DTO from OpenAPI format to SDK format
-    static func toModel(_ receipt: Components.Schemas.PaymentGateway_Contracts_Transactions_TransactionReceiptDto) -> TransactionReceiptDto {
+    static func toModel(_ receipt: Components.Schemas.TransactionReceiptIsvDto) -> TransactionReceiptDto {
         return TransactionReceiptDto(
             transactionId: receipt.transactionId,
             transactionDateTime: receipt.transactionDateTime,
@@ -31,10 +31,10 @@ struct TransactionReceiptDtoMapper {
             source: TransactionDetailMapper.mapSourceResponseDto(receipt.source),
             responseCode: receipt.responseCode,
             responseDescription: receipt.responseDescription,
-            cardholderAuthenticationMethodId: TransactionDetailMapper.mapCardholderAuthenticationMethod(receipt.cardholderAuthenticationMethodId),
+            cardholderAuthenticationMethodId: receipt.cardholderAuthenticationMethodId.flatMap { CardholderAuthenticationMethod(rawValue: Int($0)) },
             cardholderAuthenticationMethod: receipt.cardholderAuthenticationMethod,
             cvmResultMsg: receipt.cvmResultMsg,
-            cardDataSourceId: CardDataSourceMapper.toModel(receipt.cardDataSourceId),
+            cardDataSourceId: receipt.cardDataSourceId.flatMap { CardDataSource(rawValue: Int($0)) },
             cardDataSource: receipt.cardDataSource,
             cardProcessingDetails: receipt.cardProcessingDetails.map { TransactionDetailMapper.mapCardDetailsDto($0) },
             achProcessingDetails: receipt.achProcessingDetails.map { TransactionDetailMapper.mapElectronicCheckDetails($0) },

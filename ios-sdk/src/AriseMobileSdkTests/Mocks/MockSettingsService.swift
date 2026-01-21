@@ -28,9 +28,20 @@ final class MockSettingsService: SettingsServiceProtocol {
         )
     )
     
+    var permissionsResult: Result<ApiPermissionsResponse, Error> = .success(
+        ApiPermissionsResponse(
+            permissions: [
+                .featureTapToPayOnMobile,
+                .listTransactions,
+                .getTransactionDetails
+            ]
+        )
+    )
+    
     // MARK: - Call Tracking
     
     private(set) var getPaymentSettingsCallCount = 0
+    private(set) var getPermissionsCallCount = 0
     
     // MARK: - Initialization
     
@@ -51,10 +62,22 @@ final class MockSettingsService: SettingsServiceProtocol {
         }
     }
     
+    func getPermissions() async throws -> ApiPermissionsResponse {
+        getPermissionsCallCount += 1
+        
+        switch permissionsResult {
+        case .success(let permissions):
+            return permissions
+        case .failure(let error):
+            throw error
+        }
+    }
+    
     // MARK: - Reset
     
     func reset() {
         getPaymentSettingsCallCount = 0
+        getPermissionsCallCount = 0
     }
 }
 

@@ -147,76 +147,159 @@ def normalize_swagger_schemas(swagger_path: str, dry_run: bool = False) -> Dict[
     
     if not schema_renames:
         print("✅ No schemas need renaming")
-        return {}
-    
-    if dry_run:
-        print(f"\n🔍 Dry run: Would rename {len(schema_renames)} schemas")
-        return schema_renames
-    
-    # Create backup
-    backup_file = swagger_file.with_suffix(f'.backup.{int(swagger_file.stat().st_mtime)}')
-    import shutil
-    shutil.copy2(swagger_file, backup_file)
-    print(f"\n✅ Backup created: {backup_file.name}")
-    
-    # Apply renames: update schema keys
-    print("\n🔄 Updating schema keys...")
-    for old_name, new_name in schema_renames.items():
-        if old_name in schemas:
-            schemas[new_name] = schemas.pop(old_name)
-    
-    # Function to recursively update $ref values
-    def update_refs(obj):
-        """Recursively update all $ref values in the JSON structure"""
-        if isinstance(obj, dict):
-            for key, value in obj.items():
-                if key == '$ref' and isinstance(value, str):
-                    # Check if this ref points to a renamed schema
-                    for old_name, new_name in schema_renames.items():
-                        if value.endswith(old_name):
-                            obj[key] = value.replace(old_name, new_name)
-                            break
-                else:
-                    update_refs(value)
-        elif isinstance(obj, list):
-            for item in obj:
-                update_refs(item)
-    
-    # Update all $ref references
-    print("🔄 Updating $ref references...")
-    update_refs(swagger)
+    else:
+        if dry_run:
+            print(f"\n🔍 Dry run: Would rename {len(schema_renames)} schemas")
+            return schema_renames
+        
+        # Create backup
+        backup_file = swagger_file.with_suffix(f'.backup.{int(swagger_file.stat().st_mtime)}')
+        import shutil
+        shutil.copy2(swagger_file, backup_file)
+        print(f"\n✅ Backup created: {backup_file.name}")
+        
+        # Apply renames: update schema keys
+        print("\n🔄 Updating schema keys...")
+        for old_name, new_name in schema_renames.items():
+            if old_name in schemas:
+                schemas[new_name] = schemas.pop(old_name)
+        
+        # Function to recursively update $ref values
+        def update_refs(obj):
+            """Recursively update all $ref values in the JSON structure"""
+            if isinstance(obj, dict):
+                for key, value in obj.items():
+                    if key == '$ref' and isinstance(value, str):
+                        # Check if this ref points to a renamed schema
+                        for old_name, new_name in schema_renames.items():
+                            if value.endswith(old_name):
+                                obj[key] = value.replace(old_name, new_name)
+                                break
+                    else:
+                        update_refs(value)
+            elif isinstance(obj, list):
+                for item in obj:
+                    update_refs(item)
+        
+        # Update all $ref references
+        print("🔄 Updating $ref references...")
+        update_refs(swagger)
     
     # Skip removing format: date-time - we want to use Configuration(dateTranscoder: .iso8601WithFractionalSeconds)
     # This allows Swift OpenAPI Generator to automatically decode dates
     print("ℹ️  Keeping date-time format (will use Configuration for date decoding)...")
-    # date_fields_updated = 0
-    # 
-    # def remove_date_time_format(obj):
-    #     """Recursively remove format: date-time from schema definitions"""
-    #     nonlocal date_fields_updated
-    #     if isinstance(obj, dict):
-    #         # Check if this is a date-time field
-    #         if obj.get('type') == 'string' and obj.get('format') == 'date-time':
-    #             del obj['format']
-    #             date_fields_updated += 1
-    #         # Recursively process all values
-    #         for key, value in list(obj.items()):
-    #             remove_date_time_format(value)
-    #     elif isinstance(obj, list):
-    #         for item in obj:
-    #             remove_date_time_format(item)
-    # 
-    # remove_date_time_format(swagger)
-    # if date_fields_updated > 0:
-    #     print(f"  ✅ Removed format: date-time from {date_fields_updated} fields")
-    # else:
-    #     print("  ℹ️  No date-time fields found")
     
-    # Write the updated swagger file
-    with open(swagger_file, 'w', encoding='utf-8') as f:
-        json.dump(swagger, f, indent=2, ensure_ascii=False)
+    # Remove additionalProperties from properties (it should only be at schema level)
+    print("🔧 Removing additionalProperties from properties...")
+    properties_fixed = 0
     
-    print(f"\n✅ Successfully normalized {len(schema_renames)} schema names")
+    def remove_additional_properties_from_properties(obj):
+        """Remove additionalProperties that are incorrectly placed in properties"""
+        nonlocal properties_fixed
+        if isinstance(obj, dict):
+            if 'properties' in obj and isinstance(obj['properties'], dict):
+                # Remove "additionalProperties" if it's a property name (boolean value)
+                if 'additionalProperties' in obj['properties']:
+                    prop_value = obj['properties']['additionalProperties']
+                    if isinstance(prop_value, bool):
+                        del obj['properties']['additionalProperties']
+                        properties_fixed += 1
+                
+                # Remove additionalProperties from individual property definitions
+                for prop_name, prop_value in list(obj['properties'].items()):
+                    if isinstance(prop_value, dict) and 'additionalProperties' in prop_value:
+                        del prop_value['additionalProperties']
+                        properties_fixed += 1
+                    if isinstance(prop_value, dict):
+                        remove_additional_properties_from_properties(prop_value)
+            
+            # Remove additionalProperties from securitySchemes
+            if 'securitySchemes' in obj and isinstance(obj['securitySchemes'], dict):
+                for scheme_name, scheme_value in list(obj['securitySchemes'].items()):
+                    if isinstance(scheme_value, dict) and 'additionalProperties' in scheme_value:
+                        del scheme_value['additionalProperties']
+                        properties_fixed += 1
+            
+            # Recursively process all values
+            for key, value in list(obj.items()):
+                remove_additional_properties_from_properties(value)
+        elif isinstance(obj, list):
+            for item in obj:
+                remove_additional_properties_from_properties(item)
+    
+    remove_additional_properties_from_properties(swagger)
+    if properties_fixed > 0:
+        print(f"  ✅ Removed additionalProperties from {properties_fixed} locations")
+    else:
+        print("  ℹ️  No additionalProperties found in properties")
+    
+    # Enable additionalProperties for all schemas to allow extra fields from API
+    print("🔧 Enabling additionalProperties for all schemas...")
+    additional_properties_updated = 0
+    
+    def enable_additional_properties(obj):
+        """Recursively enable additionalProperties in schema definitions"""
+        nonlocal additional_properties_updated
+        if isinstance(obj, dict):
+            # Check if this is a schema object (has type, properties, or $ref)
+            if 'type' in obj or 'properties' in obj or '$ref' in obj:
+                # If additionalProperties is explicitly set to false, change it to true
+                if obj.get('additionalProperties') is False:
+                    obj['additionalProperties'] = True
+                    additional_properties_updated += 1
+                # If additionalProperties is not set, add it as true
+                elif 'additionalProperties' not in obj and ('type' in obj or 'properties' in obj):
+                    obj['additionalProperties'] = True
+                    additional_properties_updated += 1
+            
+            # Recursively process all values
+            for key, value in list(obj.items()):
+                enable_additional_properties(value)
+        elif isinstance(obj, list):
+            for item in obj:
+                enable_additional_properties(item)
+    
+    enable_additional_properties(swagger)
+    if additional_properties_updated > 0:
+        print(f"  ✅ Enabled additionalProperties for {additional_properties_updated} schemas")
+    else:
+        print("  ℹ️  No schemas needed additionalProperties update")
+    
+    # Only write file if we made changes (renames, properties fixes, or additionalProperties)
+    if schema_renames or properties_fixed > 0 or additional_properties_updated > 0:
+        if not dry_run:
+            # Create backup if not already created
+            if schema_renames:
+                pass  # Backup already created above
+            else:
+                backup_file = swagger_file.with_suffix(f'.backup.{int(swagger_file.stat().st_mtime)}')
+                import shutil
+                shutil.copy2(swagger_file, backup_file)
+                print(f"\n✅ Backup created: {backup_file.name}")
+            
+            # Write the updated swagger file
+            with open(swagger_file, 'w', encoding='utf-8') as f:
+                json.dump(swagger, f, indent=2, ensure_ascii=False)
+            
+            if schema_renames:
+                print(f"\n✅ Successfully normalized {len(schema_renames)} schema names")
+            if properties_fixed > 0:
+                print(f"✅ Removed additionalProperties from {properties_fixed} locations")
+            if additional_properties_updated > 0:
+                print(f"✅ Enabled additionalProperties for {additional_properties_updated} schemas")
+            print(f"📄 Updated file: {swagger_file}")
+    
+    # Write the updated swagger file if we made any changes
+    if schema_renames or properties_fixed > 0 or additional_properties_updated > 0:
+        with open(swagger_file, 'w', encoding='utf-8') as f:
+            json.dump(swagger, f, indent=2, ensure_ascii=False)
+        
+        if schema_renames:
+            print(f"\n✅ Successfully normalized {len(schema_renames)} schema names")
+        if properties_fixed > 0:
+            print(f"✅ Removed additionalProperties from {properties_fixed} locations")
+        if additional_properties_updated > 0:
+            print(f"✅ Enabled additionalProperties for {additional_properties_updated} schemas")
     # if date_fields_updated > 0:
     #     print(f"✅ Removed date-time format from {date_fields_updated} fields")
     print(f"📄 Updated file: {swagger_file}")

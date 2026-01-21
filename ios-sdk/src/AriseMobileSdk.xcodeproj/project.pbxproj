@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		524E4293EB2D4DD980ACE967 /* ApiPermissionsResponse.swift in Sources */ = {isa = PBXBuildFile; fileRef = 524E4292EB2D4DD980ACE967 /* ApiPermissionsResponse.swift */; };
+		8A2FC5568C084F3C927D4BC9 /* ApiPermissionsResponseMapper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A2FC5558C084F3C927D4BC9 /* ApiPermissionsResponseMapper.swift */; };
 		C7358E4BCDC649BDA468E564 /* TokenServiceProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F7F0AF565C041DFA069B9AF /* TokenServiceProtocol.swift */; };
 		D624B4E87272402495A3CAE8 /* TTPServiceProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6788A07635984A669B953B77 /* TTPServiceProtocol.swift */; };
 		D7E81366928D4F2D854B6639 /* TransactionsServiceProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA451FB652E04F4F88F3321F /* TransactionsServiceProtocol.swift */; };
@@ -98,6 +100,7 @@
 		DC9E05912EE2E5DA00BDF286 /* AriseMobile.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = DC25D2462EAF7A9B00F942C7 /* AriseMobile.framework */; };
 		DC9E061F2EE2F5C600BDF286 /* CloudCommerce.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = DC69CC692EB130EF00A2657F /* CloudCommerce.xcframework */; };
 		DC9E06202EE2F5C600BDF286 /* CloudCommerce.xcframework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = DC69CC692EB130EF00A2657F /* CloudCommerce.xcframework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		DCA03A292F19011000BC407E /* ApiPermission.swift in Sources */ = {isa = PBXBuildFile; fileRef = DCA03A282F19011000BC407E /* ApiPermission.swift */; };
 		DCAEC7162EB4B55F006DE62E /* Environment.swift in Sources */ = {isa = PBXBuildFile; fileRef = DCAEC7142EB4B548006DE62E /* Environment.swift */; };
 		DCAEC7192EB4B81B006DE62E /* EnvironmentSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = DCAEC7182EB4B819006DE62E /* EnvironmentSettings.swift */; };
 		DCB03C6B2EB3621500E180BE /* SwiftASN1 in Frameworks */ = {isa = PBXBuildFile; productRef = DCB03C6A2EB3621500E180BE /* SwiftASN1 */; };
@@ -210,7 +213,9 @@
 
 /* Begin PBXFileReference section */
 		4F7F0AF565C041DFA069B9AF /* TokenServiceProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TokenServiceProtocol.swift; sourceTree = "<group>"; };
+		524E4292EB2D4DD980ACE967 /* ApiPermissionsResponse.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApiPermissionsResponse.swift; sourceTree = "<group>"; };
 		6788A07635984A669B953B77 /* TTPServiceProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TTPServiceProtocol.swift; sourceTree = "<group>"; };
+		8A2FC5558C084F3C927D4BC9 /* ApiPermissionsResponseMapper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApiPermissionsResponseMapper.swift; sourceTree = "<group>"; };
 		DC25D2462EAF7A9B00F942C7 /* AriseMobile.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = AriseMobile.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		DC25D2492EAF7A9B00F942C7 /* AriseMobileSdk.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AriseMobileSdk.swift; sourceTree = "<group>"; };
 		DC25D24B2EAF7A9B00F942C7 /* AriseMobileSdk-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "AriseMobileSdk-Info.plist"; sourceTree = "<group>"; };
@@ -294,6 +299,7 @@
 		DC9805072EC22902008C119A /* AvailableOperationMapper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AvailableOperationMapper.swift; sourceTree = "<group>"; };
 		DC9AD0E12F1129AF00624FC8 /* CreateMethodId.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CreateMethodId.swift; sourceTree = "<group>"; };
 		DC9E058D2EE2E5D900BDF286 /* AriseMobileSdkTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = AriseMobileSdkTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		DCA03A282F19011000BC407E /* ApiPermission.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApiPermission.swift; sourceTree = "<group>"; };
 		DCAEC7142EB4B548006DE62E /* Environment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Environment.swift; sourceTree = "<group>"; };
 		DCAEC7182EB4B819006DE62E /* EnvironmentSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EnvironmentSettings.swift; sourceTree = "<group>"; };
 		DCB03C392EB361E800E180BE /* AriseTestAppForDebug.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = AriseTestAppForDebug.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -678,6 +684,8 @@
 				DCD92D442EC5E33300867D2D /* PaymentProcessor.swift */,
 				DCD92D452EC5E33300867D2D /* SettlementBatchTimeSlot.swift */,
 				DCD92D3B2EC5E20000867D2D /* PaymentSettingsResponse.swift */,
+				524E4292EB2D4DD980ACE967 /* ApiPermissionsResponse.swift */,
+				DCA03A282F19011000BC407E /* ApiPermission.swift */,
 			);
 			path = Settings;
 			sourceTree = "<group>";
@@ -689,6 +697,7 @@
 				DCD92D5A2EC5F21400867D2D /* PaymentProcessorMapper.swift */,
 				DCD92D5B2EC5F21400867D2D /* SettlementBatchTimeSlotMapper.swift */,
 				DCD92D3E2EC5E2CE00867D2D /* PaymentSettingsResponseMapper.swift */,
+				8A2FC5558C084F3C927D4BC9 /* ApiPermissionsResponseMapper.swift */,
 			);
 			path = Settings;
 			sourceTree = "<group>";
@@ -881,6 +890,7 @@
 				DC5D64962ED0B3A20049DD8F /* TTPError.swift in Sources */,
 				DC5C0FAB2EBDF3D300A9C65A /* EMVFallbackLastChipReadMapper.swift in Sources */,
 				DCD92D3F2EC5E2CE00867D2D /* PaymentSettingsResponseMapper.swift in Sources */,
+				8A2FC5568C084F3C927D4BC9 /* ApiPermissionsResponseMapper.swift in Sources */,
 				DC5C10DD2EBE03DF00A9C65A /* DecodingErrorHandler.swift in Sources */,
 				DCD92D502EC5E40000867D2D /* DeviceIdentifier.swift in Sources */,
 				DC5C0FAC2EBDF3D300A9C65A /* EMVFallbackConditionMapper.swift in Sources */,
@@ -936,6 +946,7 @@
 				DC7B20032EC400AB00B1B1B3 /* AuthenticationResult.swift in Sources */,
 				DC7B20042EC400AB00B1B1B4 /* AchDetailsDto.swift in Sources */,
 				DCD92D3C2EC5E20000867D2D /* PaymentSettingsResponse.swift in Sources */,
+				524E4293EB2D4DD980ACE967 /* ApiPermissionsResponse.swift in Sources */,
 				DC7B20052EC400AB00B1B1B5 /* AddressDto.swift in Sources */,
 				DC7B20062EC400AB00B1B1B6 /* AmountDto.swift in Sources */,
 				DC7B20072EC400AB00B1B1B7 /* AuthorizationRequest.swift in Sources */,
@@ -981,6 +992,7 @@
 				DC7B20222EC400AB00B1B1D2 /* TransactionSummary.swift in Sources */,
 				DC7B20232EC400AB00B1B1D3 /* TransactionType.swift in Sources */,
 				DC7B20242EC400AB00B1B1D4 /* TsysCardDetailsDto.swift in Sources */,
+				DCA03A292F19011000BC407E /* ApiPermission.swift in Sources */,
 				DC5E408B2ED8889200D3F420 /* TransactionProductMapper.swift in Sources */,
 				DCE8E4812EDD9CC6009686C0 /* TTPCVMData.swift in Sources */,
 				DC4930902EBB535E00848E20 /* TransactionsResponseMapper.swift in Sources */,

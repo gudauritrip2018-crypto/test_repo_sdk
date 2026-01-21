@@ -5,7 +5,7 @@ struct CardDataSourceMapper {
     /// Map SDK's CardDataSource to OpenAPI generated format
     /// - Parameter cardDataSource: SDK's card data source enum
     /// - Returns: Generated API enum format
-    static func toGeneratedInput(_ cardDataSource: CardDataSource) -> Components.Schemas.PaymentGateway_Contracts_Enums_CardDataSource {
+    static func toGeneratedInput(_ cardDataSource: CardDataSource) -> Components.Schemas.CardDataSourceDto {
         switch cardDataSource {
         case .internet:
             return ._1
@@ -25,7 +25,7 @@ struct CardDataSourceMapper {
     }
     
     /// Map card data source enum
-    public static func toModel(_ source: Components.Schemas.PaymentGateway_Contracts_Enums_CardDataSource?) -> CardDataSource? {
+    public static func toModel(_ source: Components.Schemas.CardDataSourceDto?) -> CardDataSource? {
         guard let source = source else { return nil }
         return CardDataSource(rawValue: Int(source.rawValue))
     }

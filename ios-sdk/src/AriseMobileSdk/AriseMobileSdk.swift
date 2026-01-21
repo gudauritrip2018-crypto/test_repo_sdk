@@ -43,7 +43,7 @@ public class AriseMobileSdk {
             // Map Arise Environment to CloudCommerce Environment
             // Note: Currently mapping all environments to sandbox for compatibility
             // This should be updated when proper environment mapping is determined
-            let cloudCommerceEnvironment: CloudCommerce.TargetEnvironment = .sandbox
+            let cloudCommerceEnvironment: CloudCommerce.TargetEnvironment = environment == .uat ? .sandbox : .prod
             let sdk = try CloudCommerceSDK(environment: cloudCommerceEnvironment)
             cloudCommerceSDK = CloudCommerceSDKWrapper(sdk)
             AriseLogger.shared.debug("Initialized CloudCommerce SDK with environment: \(cloudCommerceEnvironment), version: \(sdk.version)")
@@ -210,6 +210,20 @@ public class AriseMobileSdk {
     public func authenticate(clientId: String, clientSecret: String) async throws -> AuthenticationResult {
        
         return try await _tokenService.authenticate(clientId: clientId, clientSecret: clientSecret)
+    }
+    
+    /// Returns the list of enabled API permissions for the currently authenticated user.
+    ///
+    /// - Returns: `ApiPermissionsResponse` containing list of enabled API permissions.
+    /// - Throws: `AriseApiError` if the request fails.
+    ///
+    /// Example usage:
+    /// ```swift
+    /// let permissions = try await ariseSdk.getPermissions()
+    /// print("Enabled permissions: \(permissions.permissions)")
+    /// ```
+    public func getPermissions() async throws -> ApiPermissionsResponse {
+        return try await _settingsService.getPermissions()
     }
     
     /// Returns the version of the embedded Tap to Pay SDK binary.

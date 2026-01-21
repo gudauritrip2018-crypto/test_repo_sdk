@@ -103,15 +103,7 @@ internal class AriseAuthApi: @unchecked Sendable, AriseAuthApiProtocol {
         request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
         let bodyString = formURLEncodedString(from: bodyParameters)
         request.httpBody = bodyString.data(using: String.Encoding.utf8)
-        
-        var logBody = "[request body redacted]"
-        #if DEBUG
-        logBody = "\(bodyString, default: "")"
-        #endif
-        
-        // Log request without sensitive body data
-        logger.verbose("\(request.httpMethod ?? "") \(url.absoluteString)  \( logBody)")
-        
+                
         var responseData: Data?
         var httpResponse: HTTPURLResponse?
         do {

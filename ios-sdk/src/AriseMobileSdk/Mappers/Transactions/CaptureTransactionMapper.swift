@@ -4,8 +4,8 @@ internal struct CaptureTransactionMapper {
     static func toGeneratedInput(
         transactionId: String,
         amount: Double
-    ) -> Components.Schemas.PaymentGateway_Contracts_PublicApi_Isv_Transactions_Capture_IsvCaptureRequest {
-        return Components.Schemas.PaymentGateway_Contracts_PublicApi_Isv_Transactions_Capture_IsvCaptureRequest(
+    ) -> Components.Schemas.CaptureRequestDto {
+        return Components.Schemas.CaptureRequestDto(
             amount: amount,
             transactionId: transactionId
         )

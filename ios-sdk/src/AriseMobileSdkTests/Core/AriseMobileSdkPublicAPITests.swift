@@ -581,6 +581,96 @@ struct AriseMobileSdkPublicAPITests {
     
     // MARK: - Settings Methods Tests
     
+    @Test("AriseMobileSdk getPermissions delegates to SettingsService")
+    func testGetPermissionsDelegatesToSettingsService() async throws {
+        let sdk = try createSDK()
+        let mockSettingsService = MockSettingsService()
+        
+        // Create SDK with mocked SettingsService
+        let sdkWithMock = try AriseMobileSdk(
+            environment: .uat,
+            settingsService: mockSettingsService
+        )
+        
+        // Set up mock response
+        let expectedPermissions = ApiPermissionsResponse(
+            permissions: [
+                .featureTapToPayOnMobile,
+                .listTransactions,
+                .getTransactionDetails
+            ]
+        )
+        mockSettingsService.permissionsResult = .success(expectedPermissions)
+        
+        // Call the method
+        let result = try await sdkWithMock.getPermissions()
+        
+        // Verify delegation
+        #expect(mockSettingsService.getPermissionsCallCount == 1)
+        #expect(result.permissions.count == 3)
+        #expect(result.permissions.contains(.featureTapToPayOnMobile))
+        #expect(result.permissions.contains(.listTransactions))
+        #expect(result.permissions.contains(.getTransactionDetails))
+    }
+    
+    @Test("AriseMobileSdk getPermissions handles errors from SettingsService")
+    func testGetPermissionsHandlesErrors() async throws {
+        let sdk = try createSDK()
+        let mockSettingsService = MockSettingsService()
+        
+        // Create SDK with mocked SettingsService
+        let sdkWithMock = try AriseMobileSdk(
+            environment: .uat,
+            settingsService: mockSettingsService
+        )
+        
+        // Set up mock error
+        mockSettingsService.permissionsResult = .failure(AriseApiError.networkError("Network error"))
+        
+        // Call the method and expect error
+        await #expect(throws: AriseApiError.self) {
+            try await sdkWithMock.getPermissions()
+        }
+        
+        // Verify delegation
+        #expect(mockSettingsService.getPermissionsCallCount == 1)
+    }
+    
+    @Test("AriseMobileSdk getPermissions returns correct structure")
+    func testGetPermissionsReturnsCorrectStructure() async throws {
+        let sdk = try createSDK()
+        let mockSettingsService = MockSettingsService()
+        
+        // Create SDK with mocked SettingsService
+        let sdkWithMock = try AriseMobileSdk(
+            environment: .uat,
+            settingsService: mockSettingsService
+        )
+        
+        // Set up mock response with various permissions
+        let expectedPermissions = ApiPermissionsResponse(
+            permissions: [
+                .posStartTransaction,
+                .ecommerceSale,
+                .achDebit,
+                .featureTapToPayOnMobile,
+                .generalPing
+            ]
+        )
+        mockSettingsService.permissionsResult = .success(expectedPermissions)
+        
+        // Call the method
+        let result = try await sdkWithMock.getPermissions()
+        
+        // Verify structure
+        #expect(result.permissions.count == 5)
+        #expect(result.permissions.contains(.posStartTransaction))
+        #expect(result.permissions.contains(.ecommerceSale))
+        #expect(result.permissions.contains(.achDebit))
+        #expect(result.permissions.contains(.featureTapToPayOnMobile))
+        #expect(result.permissions.contains(.generalPing))
+    }
+    
     @Test("AriseMobileSdk getPaymentSettings delegates to SettingsService")
     func testGetPaymentSettingsDelegatesToSettingsService() async throws {
         let sdk = try createSDK()

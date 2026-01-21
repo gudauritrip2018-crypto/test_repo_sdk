@@ -1,7 +1,7 @@
 import Foundation
 
 internal struct PaymentProcessorMapper {
-    static func toModel(_ dto: Components.Schemas.PaymentProcessorDto) -> PaymentProcessor {
+    static func toModel(_ dto: Components.Schemas.PaymentProcessorIsvDto) -> PaymentProcessor {
         return PaymentProcessor(
             id: dto.id,
             name: dto.name,
