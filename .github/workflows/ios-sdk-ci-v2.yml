@@ -12,7 +12,7 @@ on:
 
 jobs:
   setup:
-    runs-on: macos-15
+    runs-on: ubuntu-latest
     timeout-minutes: 10
     outputs:
       version: ${{ steps.version.outputs.version }}
@@ -255,7 +255,7 @@ jobs:
 
   release:
     needs: [setup, test, build]
-    runs-on: macos-15
+    runs-on: ubuntu-latest
     timeout-minutes: 15
 
     steps:
