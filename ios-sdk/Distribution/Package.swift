@@ -4,14 +4,14 @@
 import PackageDescription
 
 let package = Package(
-    name: "AriseMobileSdkIos",
+    name: "ARISEMobileSDK",
     platforms: [
         .iOS(.v15)
     ],
     products: [
         .library(
-            name: "AriseMobileSdkIos",
-            targets: ["AriseMobileSdkIos"]
+            name: "ARISEMobileSDK",
+            targets: ["ARISEMobileSDK"]
         ),
     ],
     dependencies: [
@@ -34,7 +34,7 @@ let package = Package(
             path: "./libs/CloudCommerce.xcframework"
         ),
         .target(
-            name: "AriseMobileSdkIos",
+            name: "ARISEMobileSDK",
             dependencies: [
                 "AriseMobile",
                 "CloudCommerce",
@@ -45,7 +45,7 @@ let package = Package(
                 .product(name: "SwiftASN1", package: "swift-asn1"),
                 .product(name: "X509", package: "swift-certificates"),
             ],
-            path: "Sources/AriseMobileSdkIos"
+            path: "Sources/ARISEMobileSDK"
         ),
     ]
 )

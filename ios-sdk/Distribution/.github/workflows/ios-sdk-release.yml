@@ -105,8 +105,8 @@ jobs:
           cp ios-sdk/Distribution/README.md distribution-repo/ 2>/dev/null || true
           
           # Copy Sources directory
-          mkdir -p distribution-repo/Sources/AriseMobileSdkIos
-          cp -R ios-sdk/Distribution/Sources/AriseMobileSdkIos/* distribution-repo/Sources/AriseMobileSdkIos/
+          mkdir -p distribution-repo/Sources/ARISEMobileSDK
+          cp -R ios-sdk/Distribution/Sources/ARISEMobileSDK/* distribution-repo/Sources/ARISEMobileSDK/
           
           # Copy libs directory
           mkdir -p distribution-repo/libs

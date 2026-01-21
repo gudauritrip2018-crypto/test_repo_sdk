@@ -28,7 +28,7 @@ Or add it via Xcode:
 ## Usage
 
 ```swift
-import AriseMobileSdkIos
+import ARISEMobileSDK
 
 // Initialize the SDK
 let sdk = try AriseMobileSdk(environment: .uat)

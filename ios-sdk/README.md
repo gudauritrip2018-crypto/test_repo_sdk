@@ -257,7 +257,7 @@ Distribution/
 ├── Package.swift    # SPM package manifest (copied to distribution repo)
 ├── README.md        # SDK documentation for distribution repo
 ├── Sources/         # Swift wrapper files for SPM
-│   └── AriseMobileSdkIos/
+│   └── ARISEMobileSDK/
 └── libs/            # Built XCFrameworks (created by CI)
 ```
 
