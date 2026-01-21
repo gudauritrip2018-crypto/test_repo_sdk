@@ -7,7 +7,7 @@ struct TransactionsResponseMapperTests {
     
     @Test("TransactionsResponseMapper maps response with items")
     func testTransactionsResponseMapperWithItems() throws {
-        let amount = Components.Schemas.PaymentGateway_Contracts_Amounts_AmountDto(
+        let amount = Components.Schemas.IsvAmountDto(
             baseAmount: 100.0,
             percentageOffAmount: nil,
             percentageOffRate: nil,
@@ -22,21 +22,21 @@ struct TransactionsResponseMapperTests {
             totalAmount: 100.0
         )
         
-        let source1 = Components.Schemas.PaymentGateway_Contracts_SourceResponseDto(
+        let source1 = Components.Schemas.SourceResponseIsvDto(
             typeId: 1,
             _type: "pos",
             id: "source-1",
             name: "POS Terminal 1"
         )
         
-        let source2 = Components.Schemas.PaymentGateway_Contracts_SourceResponseDto(
+        let source2 = Components.Schemas.SourceResponseIsvDto(
             typeId: 2,
             _type: "ecommerce",
             id: "source-2",
             name: "E-commerce"
         )
         
-        let item1 = Components.Schemas.PaymentGateway_Contracts_PublicApi_Isv_Transactions_GetPage_GetIsvTransactionsResponse(
+        let item1 = Components.Schemas.GetIsvTransactionsResponseDto(
             id: "txn-1",
             paymentProcessorId: "processor-1",
             date: Date(),
@@ -68,7 +68,7 @@ struct TransactionsResponseMapperTests {
             amount: amount
         )
         
-        let item2 = Components.Schemas.PaymentGateway_Contracts_PublicApi_Isv_Transactions_GetPage_GetIsvTransactionsResponse(
+        let item2 = Components.Schemas.GetIsvTransactionsResponseDto(
             id: "txn-2",
             paymentProcessorId: "processor-2",
             date: Date(),
@@ -100,7 +100,7 @@ struct TransactionsResponseMapperTests {
             amount: amount
         )
         
-        let pageResponse = Components.Schemas.TransactionsPageResponse(
+        let pageResponse = Components.Schemas.TransactionsResponseDtoPageResponse(
             items: [item1, item2],
             total: 2
         )
@@ -119,7 +119,7 @@ struct TransactionsResponseMapperTests {
     
     @Test("TransactionsResponseMapper maps response with empty items")
     func testTransactionsResponseMapperWithEmptyItems() throws {
-        let pageResponse = Components.Schemas.TransactionsPageResponse(
+        let pageResponse = Components.Schemas.TransactionsResponseDtoPageResponse(
             items: [],
             total: 0
         )
@@ -136,7 +136,7 @@ struct TransactionsResponseMapperTests {
     
     @Test("TransactionsResponseMapper maps response with nil items")
     func testTransactionsResponseMapperWithNilItems() throws {
-        let pageResponse = Components.Schemas.TransactionsPageResponse(
+        let pageResponse = Components.Schemas.TransactionsResponseDtoPageResponse(
             items: nil,
             total: 0
         )
@@ -153,7 +153,7 @@ struct TransactionsResponseMapperTests {
     
     @Test("TransactionsResponseMapper filters out invalid items")
     func testTransactionsResponseMapperFiltersInvalidItems() throws {
-        let amount = Components.Schemas.PaymentGateway_Contracts_Amounts_AmountDto(
+        let amount = Components.Schemas.IsvAmountDto(
             baseAmount: 100.0,
             percentageOffAmount: nil,
             percentageOffRate: nil,
@@ -169,14 +169,14 @@ struct TransactionsResponseMapperTests {
         )
         
         // Valid item
-        let source = Components.Schemas.PaymentGateway_Contracts_SourceResponseDto(
+        let source = Components.Schemas.SourceResponseIsvDto(
             typeId: 1,
             _type: "pos",
             id: "source-1",
             name: "POS Terminal"
         )
         
-        let validItem = Components.Schemas.PaymentGateway_Contracts_PublicApi_Isv_Transactions_GetPage_GetIsvTransactionsResponse(
+        let validItem = Components.Schemas.GetIsvTransactionsResponseDto(
             id: "txn-valid",
             paymentProcessorId: nil,
             date: Date(),
@@ -209,7 +209,7 @@ struct TransactionsResponseMapperTests {
         )
         
         // Invalid item - missing id
-        let invalidItem1 = Components.Schemas.PaymentGateway_Contracts_PublicApi_Isv_Transactions_GetPage_GetIsvTransactionsResponse(
+        let invalidItem1 = Components.Schemas.GetIsvTransactionsResponseDto(
             id: nil,
             paymentProcessorId: nil,
             date: Date(),
@@ -242,7 +242,7 @@ struct TransactionsResponseMapperTests {
         )
         
         // Invalid item - missing merchantId
-        let invalidItem2 = Components.Schemas.PaymentGateway_Contracts_PublicApi_Isv_Transactions_GetPage_GetIsvTransactionsResponse(
+        let invalidItem2 = Components.Schemas.GetIsvTransactionsResponseDto(
             id: "txn-no-merchant",
             paymentProcessorId: nil,
             date: Date(),
@@ -274,7 +274,7 @@ struct TransactionsResponseMapperTests {
             amount: nil
         )
         
-        let pageResponse = Components.Schemas.TransactionsPageResponse(
+        let pageResponse = Components.Schemas.TransactionsResponseDtoPageResponse(
             items: [validItem, invalidItem1, invalidItem2],
             total: 3
         )

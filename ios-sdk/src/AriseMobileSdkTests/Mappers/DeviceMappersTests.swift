@@ -9,7 +9,7 @@ struct DeviceMappersTests {
     
     @Test("DeviceMapper converts generated response to model")
     func testDeviceMapperToModel() throws {
-        let generatedResponse = Components.Schemas.PaymentGateway_Contracts_PublicApi_Isv_Devices_Get_DeviceResponse(
+        let generatedResponse = Components.Schemas.DeviceResponseDto(
             deviceId: "test-device-id",
             deviceName: "Test Device",
             lastLoginAt: Date(),
@@ -30,7 +30,7 @@ struct DeviceMappersTests {
     
     @Test("DeviceMapper throws error when deviceId is missing")
     func testDeviceMapperMissingDeviceId() {
-        let generatedResponse = Components.Schemas.PaymentGateway_Contracts_PublicApi_Isv_Devices_Get_DeviceResponse(
+        let generatedResponse = Components.Schemas.DeviceResponseDto(
             deviceId: nil,
             deviceName: "Test Device",
             lastLoginAt: nil,
@@ -47,7 +47,7 @@ struct DeviceMappersTests {
     
     @Test("DeviceMapper throws error when deviceId is empty")
     func testDeviceMapperEmptyDeviceId() {
-        let generatedResponse = Components.Schemas.PaymentGateway_Contracts_PublicApi_Isv_Devices_Get_DeviceResponse(
+        let generatedResponse = Components.Schemas.DeviceResponseDto(
             deviceId: "",
             deviceName: "Test Device",
             lastLoginAt: nil,
@@ -66,7 +66,7 @@ struct DeviceMappersTests {
     
     @Test("DevicesResponseMapper converts generated output to model")
     func testDevicesResponseMapperToModel() throws {
-        let deviceResponse1 = Components.Schemas.PaymentGateway_Contracts_PublicApi_Isv_Devices_Get_DeviceResponse(
+        let deviceResponse1 = Components.Schemas.DeviceResponseDto(
             deviceId: "device-1",
             deviceName: "Device 1",
             lastLoginAt: Date(),
@@ -76,7 +76,7 @@ struct DeviceMappersTests {
             userProfiles: []
         )
         
-        let deviceResponse2 = Components.Schemas.PaymentGateway_Contracts_PublicApi_Isv_Devices_Get_DeviceResponse(
+        let deviceResponse2 = Components.Schemas.DeviceResponseDto(
             deviceId: "device-2",
             deviceName: "Device 2",
             lastLoginAt: nil,
@@ -86,7 +86,7 @@ struct DeviceMappersTests {
             userProfiles: nil
         )
         
-        let getDevicesResponse = Components.Schemas.PaymentGateway_Contracts_PublicApi_Isv_Devices_Get_GetDevicesResponse(
+        let getDevicesResponse = Components.Schemas.GetIsvDevicesResponseDto(
             devices: [deviceResponse1, deviceResponse2]
         )
         
@@ -109,7 +109,7 @@ struct DeviceMappersTests {
     
     @Test("DevicesResponseMapper converts empty devices list to model")
     func testDevicesResponseMapperEmptyDevices() throws {
-        let getDevicesResponse = Components.Schemas.PaymentGateway_Contracts_PublicApi_Isv_Devices_Get_GetDevicesResponse(
+        let getDevicesResponse = Components.Schemas.GetIsvDevicesResponseDto(
             devices: []
         )
         
@@ -126,7 +126,7 @@ struct DeviceMappersTests {
     
     @Test("DeviceUserMapper converts generated user to model")
     func testDeviceUserMapperToModel() {
-        let generatedUser = Components.Schemas.PaymentGateway_Contracts_PublicApi_Isv_Devices_Get_DeviceUserResponse(
+        let generatedUser = Components.Schemas.DeviceUserResponseDto(
             id: "test-user-id",
             firstName: "John",
             lastName: "Doe",
@@ -145,7 +145,7 @@ struct DeviceMappersTests {
     
     @Test("DeviceMapper handles nil optional fields")
     func testDeviceMapperWithNilFields() throws {
-        let generatedResponse = Components.Schemas.PaymentGateway_Contracts_PublicApi_Isv_Devices_Get_DeviceResponse(
+        let generatedResponse = Components.Schemas.DeviceResponseDto(
             deviceId: "test-device-id",
             deviceName: nil,
             lastLoginAt: nil,
@@ -167,14 +167,14 @@ struct DeviceMappersTests {
     
     @Test("DeviceMapper handles user profiles")
     func testDeviceMapperWithUserProfiles() throws {
-        let userProfile = Components.Schemas.PaymentGateway_Contracts_PublicApi_Isv_Devices_Get_DeviceUserResponse(
+        let userProfile = Components.Schemas.DeviceUserResponseDto(
             id: "user-1",
             firstName: "John",
             lastName: "Doe",
             email: "john@example.com"
         )
         
-        let generatedResponse = Components.Schemas.PaymentGateway_Contracts_PublicApi_Isv_Devices_Get_DeviceResponse(
+        let generatedResponse = Components.Schemas.DeviceResponseDto(
             deviceId: "test-device-id",
             deviceName: "Test Device",
             lastLoginAt: Date(),
@@ -193,7 +193,7 @@ struct DeviceMappersTests {
     
     @Test("DeviceMapper handles empty user profiles")
     func testDeviceMapperWithEmptyUserProfiles() throws {
-        let generatedResponse = Components.Schemas.PaymentGateway_Contracts_PublicApi_Isv_Devices_Get_DeviceResponse(
+        let generatedResponse = Components.Schemas.DeviceResponseDto(
             deviceId: "test-device-id",
             deviceName: "Test Device",
             lastLoginAt: nil,
@@ -210,7 +210,7 @@ struct DeviceMappersTests {
     
     @Test("DevicesResponseMapper handles devices with different statuses")
     func testDevicesResponseMapperDifferentStatuses() throws {
-        let activeDevice = Components.Schemas.PaymentGateway_Contracts_PublicApi_Isv_Devices_Get_DeviceResponse(
+        let activeDevice = Components.Schemas.DeviceResponseDto(
             deviceId: "device-active",
             deviceName: "Active Device",
             lastLoginAt: Date(),
@@ -220,7 +220,7 @@ struct DeviceMappersTests {
             userProfiles: []
         )
         
-        let inactiveDevice = Components.Schemas.PaymentGateway_Contracts_PublicApi_Isv_Devices_Get_DeviceResponse(
+        let inactiveDevice = Components.Schemas.DeviceResponseDto(
             deviceId: "device-inactive",
             deviceName: "Inactive Device",
             lastLoginAt: nil,
@@ -230,7 +230,7 @@ struct DeviceMappersTests {
             userProfiles: nil
         )
         
-        let getDevicesResponse = Components.Schemas.PaymentGateway_Contracts_PublicApi_Isv_Devices_Get_GetDevicesResponse(
+        let getDevicesResponse = Components.Schemas.GetIsvDevicesResponseDto(
             devices: [activeDevice, inactiveDevice]
         )
         
@@ -249,7 +249,7 @@ struct DeviceMappersTests {
     
     @Test("DeviceUserMapper handles nil optional fields")
     func testDeviceUserMapperWithNilFields() {
-        let generatedUser = Components.Schemas.PaymentGateway_Contracts_PublicApi_Isv_Devices_Get_DeviceUserResponse(
+        let generatedUser = Components.Schemas.DeviceUserResponseDto(
             id: "test-user-id",
             firstName: nil,
             lastName: nil,

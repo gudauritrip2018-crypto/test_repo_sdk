@@ -9,7 +9,7 @@ struct TransactionMappersTests {
     
     @Test("TransactionDetailMapper converts generated output to model")
     func testTransactionDetailMapperToModel() throws {
-        let amountDto = Components.Schemas.PaymentGateway_Contracts_Transactions_TransactionReceiptDto_AmountDto(
+        let amountDto = Components.Schemas.AmountIsvDto(
             baseAmount: 100.0,
             percentageOffAmount: nil,
             percentageOffRate: nil,
@@ -22,18 +22,18 @@ struct TransactionMappersTests {
             totalAmount: 113.0
         )
         
-        let avsResponse = Components.Schemas.PaymentGateway_Contracts_Transactions_AvsResponseDto(
-            actionId: ._1,
+        let avsResponse = Components.Schemas.AvsResponseIsvDto(
+            actionId: 1,
             action: "Match",
             responseCode: "Y",
-            groupId: ._1,
+            groupId: 1,
             group: "Address",
-            resultId: ._1,
+            resultId: 1,
             result: "Match",
             codeDescription: "Address and ZIP match"
         )
         
-        let responseBody = Components.Schemas.PaymentGateway_Contracts_PublicApi_Isv_Transactions_Get_GetIsvTransactionResponse(
+        let responseBody = Components.Schemas.GetIsvTransactionResponseDto(
             transactionId: "transaction-123",
             transactionDateTime: Date(),
             amount: amountDto,
@@ -62,7 +62,7 @@ struct TransactionMappersTests {
             cardholderAuthenticationMethodId: nil,
             cardholderAuthenticationMethod: nil,
             cvmResultMsg: nil,
-            cardDataSourceId: ._7,
+            cardDataSourceId: 7,
             cardDataSource: "manual",
             responseCode: "00",
             responseDescription: "Approved",
@@ -71,11 +71,7 @@ struct TransactionMappersTests {
             availableOperations: nil,
             avsResponse: avsResponse,
             emvTags: nil,
-            orderNumber: "ORDER-456",
-            baseAmount: 100.0,
-            totalAmount: 113.0,
-            tsysCardDetails: nil,
-            achDetails: nil
+            orderNumber: "ORDER-456"
         )
         
         let okBody = Operations.GetPayApiV1TransactionsId.Output.Ok.Body.json(responseBody)
@@ -95,7 +91,5 @@ struct TransactionMappersTests {
         #expect(result.authCode == "AUTH123")
         #expect(result.responseCode == "00")
         #expect(result.avsResponse?.action == "Match")
-        #expect(result.baseAmount == 100.0)
-        #expect(result.totalAmount == 113.0)
     }
 }

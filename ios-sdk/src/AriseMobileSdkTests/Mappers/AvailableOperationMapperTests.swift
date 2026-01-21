@@ -7,12 +7,12 @@ struct AvailableOperationMapperTests {
     
     @Test("AvailableOperationMapper maps operation with all fields")
     func testAvailableOperationMapperWithAllFields() {
-        let suggestedTip = Components.Schemas.PaymentGateway_Contracts_Amounts_SuggestedTipsDto(
+        let suggestedTip = Components.Schemas.SuggestedTipsIsvDto(
             tipPercent: 15.0,
             tipAmount: 10.0
         )
         
-        let operation = Components.Schemas.PaymentGateway_Contracts_Transactions_GetPage_GetTransactionPageResponseDto_AvailableOperation(
+        let operation = Components.Schemas.AvailableOperationDto(
             typeId: 1,
             _type: "void",
             availableAmount: 100.0,
@@ -31,7 +31,7 @@ struct AvailableOperationMapperTests {
     
     @Test("AvailableOperationMapper maps operation with nil typeId")
     func testAvailableOperationMapperWithNilTypeId() {
-        let operation = Components.Schemas.PaymentGateway_Contracts_Transactions_GetPage_GetTransactionPageResponseDto_AvailableOperation(
+        let operation = Components.Schemas.AvailableOperationDto(
             typeId: nil,
             _type: "refund",
             availableAmount: 50.0,
@@ -48,7 +48,7 @@ struct AvailableOperationMapperTests {
     
     @Test("AvailableOperationMapper maps operation with nil suggestedTips")
     func testAvailableOperationMapperWithNilSuggestedTips() {
-        let operation = Components.Schemas.PaymentGateway_Contracts_Transactions_GetPage_GetTransactionPageResponseDto_AvailableOperation(
+        let operation = Components.Schemas.AvailableOperationDto(
             typeId: 2,
             _type: "capture",
             availableAmount: 75.0,
@@ -65,20 +65,20 @@ struct AvailableOperationMapperTests {
     
     @Test("AvailableOperationMapper maps operation with multiple suggested tips")
     func testAvailableOperationMapperWithMultipleSuggestedTips() {
-        let tip1 = Components.Schemas.PaymentGateway_Contracts_Amounts_SuggestedTipsDto(
+        let tip1 = Components.Schemas.SuggestedTipsIsvDto(
             tipPercent: 10.0,
             tipAmount: 5.0
         )
-        let tip2 = Components.Schemas.PaymentGateway_Contracts_Amounts_SuggestedTipsDto(
+        let tip2 = Components.Schemas.SuggestedTipsIsvDto(
             tipPercent: 15.0,
             tipAmount: 7.5
         )
-        let tip3 = Components.Schemas.PaymentGateway_Contracts_Amounts_SuggestedTipsDto(
+        let tip3 = Components.Schemas.SuggestedTipsIsvDto(
             tipPercent: 20.0,
             tipAmount: 10.0
         )
         
-        let operation = Components.Schemas.PaymentGateway_Contracts_Transactions_GetPage_GetTransactionPageResponseDto_AvailableOperation(
+        let operation = Components.Schemas.AvailableOperationDto(
             typeId: 3,
             _type: "tip",
             availableAmount: 50.0,
@@ -95,12 +95,12 @@ struct AvailableOperationMapperTests {
     
     @Test("AvailableOperationMapper maps operation with nil tipPercent and tipAmount")
     func testAvailableOperationMapperWithNilTipValues() {
-        let suggestedTip = Components.Schemas.PaymentGateway_Contracts_Amounts_SuggestedTipsDto(
+        let suggestedTip = Components.Schemas.SuggestedTipsIsvDto(
             tipPercent: nil as Double?,
             tipAmount: nil as Double?
         )
         
-        let operation = Components.Schemas.PaymentGateway_Contracts_Transactions_GetPage_GetTransactionPageResponseDto_AvailableOperation(
+        let operation = Components.Schemas.AvailableOperationDto(
             typeId: 4,
             _type: "void",
             availableAmount: 100.0,

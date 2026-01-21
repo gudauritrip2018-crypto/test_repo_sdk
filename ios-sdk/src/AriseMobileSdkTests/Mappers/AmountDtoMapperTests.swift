@@ -7,7 +7,7 @@ struct AmountDtoMapperTests {
     
     @Test("AmountDtoMapper maps amount with all fields")
     func testAmountDtoMapperWithAllFields() {
-        let amount = Components.Schemas.PaymentGateway_Contracts_Amounts_AmountDto(
+        let amount = Components.Schemas.IsvAmountDto(
             baseAmount: 100.0,
             percentageOffAmount: 10.0,
             percentageOffRate: 10.0,
@@ -40,7 +40,7 @@ struct AmountDtoMapperTests {
     
     @Test("AmountDtoMapper maps nil amount to defaults")
     func testAmountDtoMapperWithNilAmount() {
-        let result = AmountDtoMapper.toModel(nil)
+        let result = AmountDtoMapper.toModel(nil as Components.Schemas.IsvAmountDto?)
         
         #expect(result.baseAmount == 0.0)
         #expect(result.percentageOffAmount == 0.0)
@@ -58,7 +58,7 @@ struct AmountDtoMapperTests {
     
     @Test("AmountDtoMapper maps amount with partial fields")
     func testAmountDtoMapperWithPartialFields() {
-        let amount = Components.Schemas.PaymentGateway_Contracts_Amounts_AmountDto(
+        let amount = Components.Schemas.IsvAmountDto(
             baseAmount: 50.0,
             percentageOffAmount: nil,
             percentageOffRate: nil,
@@ -91,7 +91,7 @@ struct AmountDtoMapperTests {
     
     @Test("AmountDtoMapper maps amount with zero values")
     func testAmountDtoMapperWithZeroValues() {
-        let amount = Components.Schemas.PaymentGateway_Contracts_Amounts_AmountDto(
+        let amount = Components.Schemas.IsvAmountDto(
             baseAmount: 0.0,
             percentageOffAmount: 0.0,
             percentageOffRate: 0.0,
@@ -114,7 +114,7 @@ struct AmountDtoMapperTests {
     
     @Test("AmountDtoMapper maps amount with negative values")
     func testAmountDtoMapperWithNegativeValues() {
-        let amount = Components.Schemas.PaymentGateway_Contracts_Amounts_AmountDto(
+        let amount = Components.Schemas.IsvAmountDto(
             baseAmount: -10.0,
             percentageOffAmount: -5.0,
             percentageOffRate: nil,

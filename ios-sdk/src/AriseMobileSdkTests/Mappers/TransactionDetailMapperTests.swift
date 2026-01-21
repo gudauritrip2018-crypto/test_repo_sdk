@@ -9,7 +9,7 @@ struct TransactionDetailMapperTests {
     
     @Test("TransactionDetailMapper maps response with all fields")
     func testTransactionDetailMapperWithAllFields() throws {
-        let amount = Components.Schemas.PaymentGateway_Contracts_Transactions_TransactionReceiptDto_AmountDto(
+        let amount = Components.Schemas.AmountIsvDto(
             baseAmount: 100.0,
             percentageOffAmount: 10.0,
             percentageOffRate: 10.0,
@@ -22,14 +22,14 @@ struct TransactionDetailMapperTests {
             totalAmount: 113.0
         )
         
-        let source = Components.Schemas.PaymentGateway_Contracts_SourceResponseDto(
+        let source = Components.Schemas.SourceResponseIsvDto(
             typeId: 1,
             _type: "pos",
             id: "source-1",
             name: "POS Terminal"
         )
         
-        let cardDetails = Components.Schemas.PaymentGateway_Contracts_Transactions_TransactionReceiptDto_CardDetailsDto(
+        let cardDetails = Components.Schemas.CardDetailsIsvDto(
             authCode: "AUTH123",
             mid: "merchant-123",
             tid: "terminal-456",
@@ -42,14 +42,14 @@ struct TransactionDetailMapperTests {
             cardType: "Visa"
         )
         
-        let availableOperation = Components.Schemas.PaymentGateway_Contracts_Enums_TransactionOperation(
-            typeId: ._1,
+        let availableOperation = Components.Schemas.TransactionOperationIsvDto(
+            typeId: 1,
             _type: "void",
             availableAmount: 113.0,
             suggestedTips: nil
         )
         
-        let response = Components.Schemas.PaymentGateway_Contracts_PublicApi_Isv_Transactions_Get_GetIsvTransactionResponse(
+        let response = Components.Schemas.GetIsvTransactionResponseDto(
             transactionId: "txn-123",
             transactionDateTime: Date(),
             amount: amount,
@@ -78,7 +78,7 @@ struct TransactionDetailMapperTests {
             cardholderAuthenticationMethodId: nil,
             cardholderAuthenticationMethod: nil,
             cvmResultMsg: nil,
-            cardDataSourceId: ._1,
+            cardDataSourceId: 1,
             cardDataSource: "Swipe",
             responseCode: "00",
             responseDescription: "Approved",
@@ -87,19 +87,15 @@ struct TransactionDetailMapperTests {
             availableOperations: [availableOperation],
             avsResponse: nil,
             emvTags: nil,
-            orderNumber: "ORDER-456",
-            baseAmount: 100.0,
-            totalAmount: 113.0,
-            tsysCardDetails: nil,
-            achDetails: nil
+            orderNumber: "ORDER-456"
         )
-        
+
         let okBody = Operations.GetPayApiV1TransactionsId.Output.Ok.Body.json(response)
         let okResponse = Operations.GetPayApiV1TransactionsId.Output.Ok(body: okBody)
         let output = Operations.GetPayApiV1TransactionsId.Output.ok(okResponse)
-        
+
         let result = try TransactionDetailMapper.toModel(output)
-        
+
         #expect(result.transactionId == "txn-123")
         #expect(result.currency == "USD")
         #expect(result.amount != nil)
@@ -114,7 +110,7 @@ struct TransactionDetailMapperTests {
     
     @Test("TransactionDetailMapper maps response with nil fields")
     func testTransactionDetailMapperWithNilFields() throws {
-        let response = Components.Schemas.PaymentGateway_Contracts_PublicApi_Isv_Transactions_Get_GetIsvTransactionResponse(
+        let response = Components.Schemas.GetIsvTransactionResponseDto(
             transactionId: "txn-456",
             transactionDateTime: Date(),
             amount: nil,
@@ -152,19 +148,15 @@ struct TransactionDetailMapperTests {
             availableOperations: nil,
             avsResponse: nil,
             emvTags: nil,
-            orderNumber: nil,
-            baseAmount: nil,
-            totalAmount: nil,
-            tsysCardDetails: nil,
-            achDetails: nil
+            orderNumber: nil
         )
-        
+
         let okBody = Operations.GetPayApiV1TransactionsId.Output.Ok.Body.json(response)
         let okResponse = Operations.GetPayApiV1TransactionsId.Output.Ok(body: okBody)
         let output = Operations.GetPayApiV1TransactionsId.Output.ok(okResponse)
-        
+
         let result = try TransactionDetailMapper.toModel(output)
-        
+
         #expect(result.transactionId == "txn-456")
         #expect(result.amount == nil)
         #expect(result.source == nil)
@@ -177,7 +169,7 @@ struct TransactionDetailMapperTests {
     
     @Test("TransactionDetailMapper mapTransactionAmountDto maps all fields")
     func testMapTransactionAmountDto() {
-        let amount = Components.Schemas.PaymentGateway_Contracts_Transactions_TransactionReceiptDto_AmountDto(
+        let amount = Components.Schemas.AmountIsvDto(
             baseAmount: 100.0,
             percentageOffAmount: 10.0,
             percentageOffRate: 10.0,
@@ -205,14 +197,14 @@ struct TransactionDetailMapperTests {
     }
     
     @Test("TransactionDetailMapper mapSourceResponseDto returns nil for nil source")
-    func testMapSourceResponseDtoWithNil() {
+    func testMapSourceResponseIsvDtoWithNil() {
         let result = TransactionDetailMapper.mapSourceResponseDto(nil)
         #expect(result == nil)
     }
     
     @Test("TransactionDetailMapper mapSourceResponseDto maps source with all fields")
-    func testMapSourceResponseDtoWithAllFields() {
-        let source = Components.Schemas.PaymentGateway_Contracts_SourceResponseDto(
+    func testMapSourceResponseIsvDtoWithAllFields() {
+        let source = Components.Schemas.SourceResponseIsvDto(
             typeId: 1,
             _type: "pos",
             id: "source-1",
@@ -229,8 +221,8 @@ struct TransactionDetailMapperTests {
     }
     
     @Test("TransactionDetailMapper mapSourceResponseDto maps source with nil name")
-    func testMapSourceResponseDtoWithNilName() {
-        let source = Components.Schemas.PaymentGateway_Contracts_SourceResponseDto(
+    func testMapSourceResponseIsvDtoWithNilName() {
+        let source = Components.Schemas.SourceResponseIsvDto(
             typeId: 1,
             _type: "pos",
             id: "source-1",
@@ -245,13 +237,13 @@ struct TransactionDetailMapperTests {
     
     @Test("TransactionDetailMapper mapCardTokenType maps _1 to local")
     func testMapCardTokenTypeLocal() {
-        let result = TransactionDetailMapper.mapCardTokenType(Components.Schemas.PaymentGateway_Contracts_Enums_TokenType._1)
+        let result = TransactionDetailMapper.mapCardTokenType(Components.Schemas.TokenTypeDto._1)
         #expect(result == CardTokenType.local)
     }
     
     @Test("TransactionDetailMapper mapCardTokenType maps _2 to network")
     func testMapCardTokenTypeNetwork() {
-        let result = TransactionDetailMapper.mapCardTokenType(Components.Schemas.PaymentGateway_Contracts_Enums_TokenType._2)
+        let result = TransactionDetailMapper.mapCardTokenType(Components.Schemas.TokenTypeDto._2)
         #expect(result == CardTokenType.network)
     }
     
@@ -263,7 +255,7 @@ struct TransactionDetailMapperTests {
     
     @Test("TransactionDetailMapper mapCardholderAuthenticationMethod maps method")
     func testMapCardholderAuthenticationMethod() {
-        let method = Components.Schemas.PaymentGateway_Contracts_Enums_CardholderAuthenticationMethod._0
+        let method = Components.Schemas.CardholderAuthenticationMethodDto._0
         let result = TransactionDetailMapper.mapCardholderAuthenticationMethod(method)
         #expect(result != nil)
         #expect(result?.rawValue == 0)
@@ -277,7 +269,7 @@ struct TransactionDetailMapperTests {
     
     @Test("TransactionDetailMapper mapCardDetailsDto maps all fields")
     func testMapCardDetailsDto() {
-        let cardDetails = Components.Schemas.PaymentGateway_Contracts_Transactions_TransactionReceiptDto_CardDetailsDto(
+        let cardDetails = Components.Schemas.CardDetailsIsvDto(
             authCode: "AUTH123",
             mid: "merchant-123",
             tid: "terminal-456",
@@ -306,7 +298,7 @@ struct TransactionDetailMapperTests {
     
     @Test("TransactionDetailMapper mapElectronicCheckDetails maps all fields")
     func testMapElectronicCheckDetails() {
-        let details = Components.Schemas.PaymentGateway_Contracts_Transactions_TransactionReceiptDto_ElectronicCheckDetails(
+        let details = Components.Schemas.ElectronicCheckDetailsIsvDto(
             customerAccountNumber: "123456789",
             customerRoutingNumber: "987654321",
             accountHolderType: "Individual",
@@ -329,13 +321,13 @@ struct TransactionDetailMapperTests {
     
     @Test("TransactionDetailMapper mapTransactionOperation maps operation with suggested tips")
     func testMapTransactionOperationWithSuggestedTips() {
-        let suggestedTip = Components.Schemas.PaymentGateway_Contracts_Amounts_SuggestedTipsDto(
+        let suggestedTip = Components.Schemas.SuggestedTipsIsvDto(
             tipPercent: 15.0,
             tipAmount: 7.5
         )
         
-        let operation = Components.Schemas.PaymentGateway_Contracts_Enums_TransactionOperation(
-            typeId: ._1,
+        let operation = Components.Schemas.TransactionOperationIsvDto(
+            typeId: 1,
             _type: "void",
             availableAmount: 113.0,
             suggestedTips: [suggestedTip]
@@ -353,18 +345,18 @@ struct TransactionDetailMapperTests {
     
     @Test("TransactionDetailMapper mapTransactionOperation filters out tips with nil values")
     func testMapTransactionOperationFiltersNilTips() {
-        let tipWithNil = Components.Schemas.PaymentGateway_Contracts_Amounts_SuggestedTipsDto(
+        let tipWithNil = Components.Schemas.SuggestedTipsIsvDto(
             tipPercent: nil,
             tipAmount: nil
         )
         
-        let tipValid = Components.Schemas.PaymentGateway_Contracts_Amounts_SuggestedTipsDto(
+        let tipValid = Components.Schemas.SuggestedTipsIsvDto(
             tipPercent: 15.0,
             tipAmount: 7.5
         )
         
-        let operation = Components.Schemas.PaymentGateway_Contracts_Enums_TransactionOperation(
-            typeId: ._1,
+        let operation = Components.Schemas.TransactionOperationIsvDto(
+            typeId: 1,
             _type: "void",
             availableAmount: 113.0,
             suggestedTips: [tipWithNil, tipValid]
@@ -383,7 +375,7 @@ struct TransactionDetailMapperTests {
             value: "ABCD1234"
         )
         
-        let emvTags = Components.Schemas.PaymentGateway_Contracts_Transactions_TransactionReceiptDto_EmvTagsDto(
+        let emvTags = Components.Schemas.EmvTagsIsvDto(
             ac: "AC123",
             tvr: "TVR123",
             tsi: "TSI123",
@@ -416,7 +408,7 @@ struct TransactionDetailMapperTests {
             value: "ABCD1234"
         )
         
-        let emvTags = Components.Schemas.PaymentGateway_Contracts_Transactions_TransactionReceiptDto_EmvTagsDto(
+        let emvTags = Components.Schemas.EmvTagsIsvDto(
             ac: nil,
             tvr: nil,
             tsi: nil,

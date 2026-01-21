@@ -7,7 +7,7 @@ struct IsvTransactionResponseMapperTests {
     
     @Test("TransactionResponseMapper maps response with all fields")
     func testTransactionResponseMapperWithAllFields() {
-        let details = Components.Schemas.PaymentGateway_Contracts_Transactions_TransactionResponseDetailsDto(
+        let details = Components.Schemas.TransactionResponseDetailsIsvDto(
             hostResponseCode: "00",
             hostResponseMessage: "Approved",
             hostResponseDefinition: nil,
@@ -18,7 +18,7 @@ struct IsvTransactionResponseMapperTests {
             maskedPan: "****1234"
         )
         
-        let receiptAmount = Components.Schemas.PaymentGateway_Contracts_Transactions_TransactionReceiptDto_AmountDto(
+        let receiptAmount = Components.Schemas.AmountIsvDto(
             baseAmount: 100.0,
             percentageOffAmount: nil,
             percentageOffRate: nil,
@@ -31,7 +31,7 @@ struct IsvTransactionResponseMapperTests {
             totalAmount: 113.0
         )
         
-        let receipt = Components.Schemas.PaymentGateway_Contracts_Transactions_TransactionReceiptDto(
+        let receipt = Components.Schemas.TransactionReceiptIsvDto(
             transactionId: nil,
             transactionDateTime: nil,
             amount: receiptAmount,
@@ -72,7 +72,7 @@ struct IsvTransactionResponseMapperTests {
             orderNumber: "ORDER-456"
         )
         
-        let response = Components.Schemas.PaymentGateway_Contracts_PublicApi_Isv_Transactions_IsvTransactionResponse(
+        let response = Components.Schemas.TransactionResponseIsvDto(
             transactionId: "txn-123",
             transactionDateTime: Date(),
             typeId: 1,
@@ -96,7 +96,7 @@ struct IsvTransactionResponseMapperTests {
     
     @Test("TransactionResponseMapper maps response with nil details")
     func testTransactionResponseMapperWithNilDetails() {
-        let response = Components.Schemas.PaymentGateway_Contracts_PublicApi_Isv_Transactions_IsvTransactionResponse(
+        let response = Components.Schemas.TransactionResponseIsvDto(
             transactionId: "txn-456",
             transactionDateTime: Date(),
             typeId: 2,
@@ -118,7 +118,7 @@ struct IsvTransactionResponseMapperTests {
     
     @Test("TransactionResponseMapper maps response with empty details")
     func testTransactionResponseMapperWithEmptyDetails() {
-        let response = Components.Schemas.PaymentGateway_Contracts_PublicApi_Isv_Transactions_IsvTransactionResponse(
+        let response = Components.Schemas.TransactionResponseIsvDto(
             transactionId: "txn-789",
             transactionDateTime: Date(),
             typeId: 3,

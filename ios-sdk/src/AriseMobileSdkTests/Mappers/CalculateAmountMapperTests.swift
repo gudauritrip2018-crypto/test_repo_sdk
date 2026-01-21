@@ -53,7 +53,7 @@ struct CalculateAmountMapperTests {
     
     @Test("CalculateAmountMapper maps response to model with all fields")
     func testCalculateAmountMapperToModelWithAllFields() throws {
-        let cashAmount = Components.Schemas.PaymentGateway_Contracts_Amounts_AmountDto(
+        let cashAmount = Components.Schemas.IsvAmountDto(
             baseAmount: 100.0,
             percentageOffAmount: nil,
             percentageOffRate: nil,
@@ -68,7 +68,7 @@ struct CalculateAmountMapperTests {
             totalAmount: 100.0
         )
         
-        let creditCardAmount = Components.Schemas.PaymentGateway_Contracts_Amounts_AmountDto(
+        let creditCardAmount = Components.Schemas.IsvAmountDto(
             baseAmount: 100.0,
             percentageOffAmount: nil,
             percentageOffRate: nil,
@@ -83,7 +83,7 @@ struct CalculateAmountMapperTests {
             totalAmount: 118.0
         )
         
-        let debitCardAmount = Components.Schemas.PaymentGateway_Contracts_Amounts_AmountDto(
+        let debitCardAmount = Components.Schemas.IsvAmountDto(
             baseAmount: 100.0,
             percentageOffAmount: nil,
             percentageOffRate: nil,
@@ -98,7 +98,7 @@ struct CalculateAmountMapperTests {
             totalAmount: 102.0
         )
         
-        let achAmount = Components.Schemas.PaymentGateway_Contracts_Amounts_AmountDto(
+        let achAmount = Components.Schemas.IsvAmountDto(
             baseAmount: 100.0,
             percentageOffAmount: nil,
             percentageOffRate: nil,
@@ -113,10 +113,10 @@ struct CalculateAmountMapperTests {
             totalAmount: 100.0
         )
         
-        let responseBody = Components.Schemas.PaymentGateway_Contracts_PublicApi_Isv_Amounts_IsvAmountsResponse(
-            currencyId: Components.Schemas.PaymentGateway_Contracts_Enums_Currency._1,
+        let responseBody = Components.Schemas.IsvAmountsResponseDto(
+            currencyId: Components.Schemas.CurrencyDto._1,
             currency: "USD",
-            zeroCostProcessingOptionId: Components.Schemas.PaymentGateway_Contracts_Enums_ZeroCostProcessingOption._1,
+            zeroCostProcessingOptionId: Components.Schemas.ZeroCostProcessingOptionDto._1,
             zeroCostProcessingOption: "Option 1",
             useCardPrice: true,
             cash: cashAmount,
@@ -148,7 +148,7 @@ struct CalculateAmountMapperTests {
     
     @Test("CalculateAmountMapper maps response with nil optional fields")
     func testCalculateAmountMapperToModelWithNilFields() throws {
-        let responseBody = Components.Schemas.PaymentGateway_Contracts_PublicApi_Isv_Amounts_IsvAmountsResponse(
+        let responseBody = Components.Schemas.IsvAmountsResponseDto(
             currencyId: nil,
             currency: nil,
             zeroCostProcessingOptionId: nil,
@@ -179,7 +179,7 @@ struct CalculateAmountMapperTests {
     
     @Test("CalculateAmountMapper maps response with partial amounts")
     func testCalculateAmountMapperToModelWithPartialAmounts() throws {
-        let creditCardAmount = Components.Schemas.PaymentGateway_Contracts_Amounts_AmountDto(
+        let creditCardAmount = Components.Schemas.IsvAmountDto(
             baseAmount: 50.0,
             percentageOffAmount: nil,
             percentageOffRate: nil,
@@ -194,8 +194,8 @@ struct CalculateAmountMapperTests {
             totalAmount: 59.0
         )
         
-        let responseBody = Components.Schemas.PaymentGateway_Contracts_PublicApi_Isv_Amounts_IsvAmountsResponse(
-            currencyId: Components.Schemas.PaymentGateway_Contracts_Enums_Currency._1,
+        let responseBody = Components.Schemas.IsvAmountsResponseDto(
+            currencyId: Components.Schemas.CurrencyDto._1,
             currency: "USD",
             zeroCostProcessingOptionId: nil,
             zeroCostProcessingOption: nil,

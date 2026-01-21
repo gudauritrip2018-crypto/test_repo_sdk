@@ -9,22 +9,22 @@ struct SettingsMappersTests {
     
     @Test("PaymentSettingsResponseMapper converts generated output to model")
     func testPaymentSettingsResponseMapperToModel() throws {
-        let currencyDto = Components.Schemas.PaymentGateway_Contracts_Configurations_Payments_GetPaymentConfigurationsResponseDto_EnumDto(
+        let currencyDto = Components.Schemas.EnumIsvDto(
             id: 1,
             name: "USD"
         )
         
-        let cardTypeDto = Components.Schemas.PaymentGateway_Contracts_Configurations_Payments_GetPaymentConfigurationsResponseDto_EnumDto(
+        let cardTypeDto = Components.Schemas.EnumIsvDto(
             id: 1,
             name: "Visa"
         )
         
-        let transactionTypeDto = Components.Schemas.PaymentGateway_Contracts_Configurations_Payments_GetPaymentConfigurationsResponseDto_EnumDto(
+        let transactionTypeDto = Components.Schemas.EnumIsvDto(
             id: 2,
             name: "Sale"
         )
         
-        let processorDto = Components.Schemas.PaymentProcessorDto(
+        let processorDto = Components.Schemas.PaymentProcessorIsvDto(
             id: "test-processor-id",
             name: "Test Processor",
             isDefault: true,
@@ -33,13 +33,13 @@ struct SettingsMappersTests {
             settlementBatchTimeSlots: nil
         )
         
-        let avsOptions = Components.Schemas.PaymentGateway_Contracts_Configurations_Payments_GetPaymentConfigurationsResponseDto_AvsOptions(
+        let avsOptions = Components.Schemas.AvsOptionsDto(
             isEnabled: true,
             profileId: Int32(123),
             profile: "Test Profile"
         )
         
-        let responseBody = Components.Schemas.PaymentGateway_Contracts_Configurations_Payments_GetPaymentConfigurationsResponseDto(
+        let responseBody = Components.Schemas.GetIsvPaymentConfigurationsResponseDto(
             zeroCostProcessingOptionId: Int32(1),
             zeroCostProcessingOption: "None",
             defaultTipsOptions: [10.0, 15.0, 20.0],
@@ -91,7 +91,7 @@ struct SettingsMappersTests {
     
     @Test("PaymentProcessorMapper converts generated processor to model")
     func testPaymentProcessorMapperToModel() {
-        let generatedProcessor = Components.Schemas.PaymentProcessorDto(
+        let generatedProcessor = Components.Schemas.PaymentProcessorIsvDto(
             id: "test-processor-id",
             name: "Test Processor",
             isDefault: true,
@@ -110,14 +110,14 @@ struct SettingsMappersTests {
     }
     
     @Test("PaymentProcessorMapper converts generated processor with settlement batch time slots to model")
-    func testPaymentProcessorMapperWithSettlementBatchTimeSlots() {
-        let timeSlot = Components.Schemas.SettlementBatchTimeSlot(
+    func testPaymentProcessorMapperWithSettlementBatchTimeSlotDtos() {
+        let timeSlot = Components.Schemas.SettlementBatchTimeSlotDto(
             hours: 14,
             minutes: 30,
             timezoneName: "America/New_York"
         )
         
-        let generatedProcessor = Components.Schemas.PaymentProcessorDto(
+        let generatedProcessor = Components.Schemas.PaymentProcessorIsvDto(
             id: "test-processor-id",
             name: "Test Processor",
             isDefault: true,
@@ -139,7 +139,7 @@ struct SettingsMappersTests {
     
     @Test("AvsOptionsMapper converts generated AVS options to model")
     func testAvsOptionsMapperToModel() {
-        let generatedAvs = Components.Schemas.PaymentGateway_Contracts_Configurations_Payments_GetPaymentConfigurationsResponseDto_AvsOptions(
+        let generatedAvs = Components.Schemas.AvsOptionsDto(
             isEnabled: true,
             profileId: Int32(123),
             profile: "Test Profile"
@@ -156,7 +156,7 @@ struct SettingsMappersTests {
     
     @Test("SettlementBatchTimeSlotMapper converts generated DTO to model")
     func testSettlementBatchTimeSlotMapperToModel() {
-        let generatedDto = Components.Schemas.SettlementBatchTimeSlot(
+        let generatedDto = Components.Schemas.SettlementBatchTimeSlotDto(
             hours: 14,
             minutes: 30,
             timezoneName: "America/New_York"
@@ -173,7 +173,7 @@ struct SettingsMappersTests {
     
     @Test("PaymentSettingsResponseMapper handles nil optional fields")
     func testPaymentSettingsResponseMapperWithNilFields() throws {
-        let responseBody = Components.Schemas.PaymentGateway_Contracts_Configurations_Payments_GetPaymentConfigurationsResponseDto(
+        let responseBody = Components.Schemas.GetIsvPaymentConfigurationsResponseDto(
             zeroCostProcessingOptionId: nil,
             zeroCostProcessingOption: nil,
             defaultTipsOptions: nil,
@@ -210,7 +210,7 @@ struct SettingsMappersTests {
     
     @Test("PaymentSettingsResponseMapper handles empty arrays")
     func testPaymentSettingsResponseMapperEmptyArrays() throws {
-        let responseBody = Components.Schemas.PaymentGateway_Contracts_Configurations_Payments_GetPaymentConfigurationsResponseDto(
+        let responseBody = Components.Schemas.GetIsvPaymentConfigurationsResponseDto(
             zeroCostProcessingOptionId: Int32(1),
             zeroCostProcessingOption: "None",
             defaultTipsOptions: [],
@@ -245,7 +245,7 @@ struct SettingsMappersTests {
     
     @Test("PaymentProcessorMapper handles nil optional fields")
     func testPaymentProcessorMapperWithNilFields() {
-        let generatedProcessor = Components.Schemas.PaymentProcessorDto(
+        let generatedProcessor = Components.Schemas.PaymentProcessorIsvDto(
             id: "test-processor-id",
             name: nil,
             isDefault: false,
@@ -265,19 +265,19 @@ struct SettingsMappersTests {
     
     @Test("PaymentProcessorMapper handles multiple settlement batch time slots")
     func testPaymentProcessorMapperMultipleTimeSlots() {
-        let timeSlot1 = Components.Schemas.SettlementBatchTimeSlot(
+        let timeSlot1 = Components.Schemas.SettlementBatchTimeSlotDto(
             hours: 9,
             minutes: 0,
             timezoneName: "America/New_York"
         )
         
-        let timeSlot2 = Components.Schemas.SettlementBatchTimeSlot(
+        let timeSlot2 = Components.Schemas.SettlementBatchTimeSlotDto(
             hours: 17,
             minutes: 30,
             timezoneName: "America/New_York"
         )
         
-        let generatedProcessor = Components.Schemas.PaymentProcessorDto(
+        let generatedProcessor = Components.Schemas.PaymentProcessorIsvDto(
             id: "test-processor-id",
             name: "Test Processor",
             isDefault: true,
@@ -295,7 +295,7 @@ struct SettingsMappersTests {
     
     @Test("AvsOptionsMapper handles nil profileId")
     func testAvsOptionsMapperWithNilProfileId() {
-        let generatedAvs = Components.Schemas.PaymentGateway_Contracts_Configurations_Payments_GetPaymentConfigurationsResponseDto_AvsOptions(
+        let generatedAvs = Components.Schemas.AvsOptionsDto(
             isEnabled: false,
             profileId: nil,
             profile: nil
@@ -311,7 +311,7 @@ struct SettingsMappersTests {
     @Test("SettlementBatchTimeSlotMapper handles edge time values")
     func testSettlementBatchTimeSlotMapperEdgeValues() {
         // Test midnight
-        let midnight = Components.Schemas.SettlementBatchTimeSlot(
+        let midnight = Components.Schemas.SettlementBatchTimeSlotDto(
             hours: 0,
             minutes: 0,
             timezoneName: "UTC"
@@ -321,7 +321,7 @@ struct SettingsMappersTests {
         #expect(result1.minutes == 0)
         
         // Test end of day
-        let endOfDay = Components.Schemas.SettlementBatchTimeSlot(
+        let endOfDay = Components.Schemas.SettlementBatchTimeSlotDto(
             hours: 23,
             minutes: 59,
             timezoneName: "UTC"

@@ -9,7 +9,7 @@ struct PaymentTransactionResultMapperTests {
     
     @Test("IsvAuthorizationResultMapper converts generated response to model")
     func testIsvAuthorizationResultMapperToModel() {
-        let details = Components.Schemas.PaymentGateway_Contracts_Transactions_TransactionResponseDetailsDto(
+        let details = Components.Schemas.TransactionResponseDetailsIsvDto(
             hostResponseCode: "00",
             hostResponseMessage: "Approved",
             hostResponseDefinition: "Transaction approved",
@@ -20,7 +20,7 @@ struct PaymentTransactionResultMapperTests {
             maskedPan: "****1234"
         )
         
-        let receipt = Components.Schemas.PaymentGateway_Contracts_Transactions_TransactionReceiptDto(
+        let receipt = Components.Schemas.TransactionReceiptIsvDto(
             transactionId: "receipt-123",
             transactionDateTime: Date(),
             amount: nil,
@@ -61,18 +61,18 @@ struct PaymentTransactionResultMapperTests {
             orderNumber: "ORDER-456"
         )
         
-        let avsResponse = Components.Schemas.PaymentGateway_Contracts_Transactions_AvsResponseDto(
-            actionId: ._1,
+        let avsResponse = Components.Schemas.AvsResponseIsvDto(
+            actionId: 1,
             action: "Match",
             responseCode: "Y",
-            groupId: ._1,
+            groupId: 1,
             group: "Address",
-            resultId: ._1,
+            resultId: 1,
             result: "Match",
             codeDescription: "Address and ZIP match"
         )
         
-        let generatedResponse = Components.Schemas.PaymentGateway_Contracts_PublicApi_Isv_Transactions_Authorization_IsvAuthorizationResponse(
+        let generatedResponse = Components.Schemas.AuthorizationResponseDto(
             transactionId: "transaction-123",
             transactionDateTime: Date(),
             typeId: 1,
@@ -102,7 +102,7 @@ struct PaymentTransactionResultMapperTests {
     
     @Test("IsvAuthorizationResultMapper handles nil optional fields")
     func testIsvAuthorizationResultMapperWithNilFields() {
-        let generatedResponse = Components.Schemas.PaymentGateway_Contracts_PublicApi_Isv_Transactions_Authorization_IsvAuthorizationResponse(
+        let generatedResponse = Components.Schemas.AuthorizationResponseDto(
             transactionId: nil,
             transactionDateTime: nil,
             typeId: nil,
@@ -131,7 +131,7 @@ struct PaymentTransactionResultMapperTests {
     
     @Test("IsvAuthorizationResultMapper handles response with only required fields")
     func testIsvAuthorizationResultMapperMinimal() {
-        let generatedResponse = Components.Schemas.PaymentGateway_Contracts_PublicApi_Isv_Transactions_Authorization_IsvAuthorizationResponse(
+        let generatedResponse = Components.Schemas.AuthorizationResponseDto(
             transactionId: "minimal-transaction",
             transactionDateTime: Date(),
             typeId: 1,
@@ -162,7 +162,7 @@ struct PaymentTransactionResultMapperTests {
         ]
         
         for (statusId, status) in statuses {
-            let generatedResponse = Components.Schemas.PaymentGateway_Contracts_PublicApi_Isv_Transactions_Authorization_IsvAuthorizationResponse(
+            let generatedResponse = Components.Schemas.AuthorizationResponseDto(
                 transactionId: "test-transaction",
                 transactionDateTime: Date(),
                 typeId: 1,
@@ -192,7 +192,7 @@ struct PaymentTransactionResultMapperTests {
         ]
         
         for (typeId, type) in types {
-            let generatedResponse = Components.Schemas.PaymentGateway_Contracts_PublicApi_Isv_Transactions_Authorization_IsvAuthorizationResponse(
+            let generatedResponse = Components.Schemas.AuthorizationResponseDto(
                 transactionId: "test-transaction",
                 transactionDateTime: Date(),
                 typeId: typeId,

@@ -62,7 +62,7 @@ struct CardDataSourceMapperTests {
     
     @Test("CardDataSourceMapper toModel maps _1 to internet")
     func testCardDataSourceMapperToModelInternet() {
-        let source = Components.Schemas.PaymentGateway_Contracts_Enums_CardDataSource._1
+        let source = Components.Schemas.CardDataSourceDto._1
         let result = CardDataSourceMapper.toModel(source)
         
         #expect(result != nil)
@@ -71,7 +71,7 @@ struct CardDataSourceMapperTests {
     
     @Test("CardDataSourceMapper toModel maps _7 to manual")
     func testCardDataSourceMapperToModelManual() {
-        let source = Components.Schemas.PaymentGateway_Contracts_Enums_CardDataSource._7
+        let source = Components.Schemas.CardDataSourceDto._7
         let result = CardDataSourceMapper.toModel(source)
         
         #expect(result != nil)

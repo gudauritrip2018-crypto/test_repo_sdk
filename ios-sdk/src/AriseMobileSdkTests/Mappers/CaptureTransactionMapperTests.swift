@@ -18,20 +18,20 @@ struct CaptureTransactionMapperTests {
     
     @Test("CaptureTransactionMapper maps response to model")
     func testCaptureTransactionMapperToModel() throws {
-        let details = Components.Schemas.PaymentGateway_Contracts_Transactions_TransactionResponseDetailsDto(
+        let details = Components.Schemas.TransactionResponseDetailsIsvDto(
             hostResponseCode: "00",
             code: "00",
             authCode: "CAPTURE123"
         )
         
-        let receiptAmount = Components.Schemas.PaymentGateway_Contracts_Transactions_TransactionReceiptDto_AmountDto(
+        let receiptAmount = Components.Schemas.AmountIsvDto(
             baseAmount: 100.50,
             surchargeAmount: 3.02,
             tipAmount: 10.05,
             totalAmount: 113.57
         )
         
-        let receipt = Components.Schemas.PaymentGateway_Contracts_Transactions_TransactionReceiptDto(
+        let receipt = Components.Schemas.TransactionReceiptIsvDto(
             amount: receiptAmount,
             currencyId: 1,
             currency: "USD",
@@ -39,7 +39,7 @@ struct CaptureTransactionMapperTests {
             authCode: "CAPTURE123"
         )
         
-        let response = Components.Schemas.PaymentGateway_Contracts_PublicApi_Isv_Transactions_IsvTransactionResponse(
+        let response = Components.Schemas.TransactionResponseIsvDto(
             transactionId: "txn-12345",
             transactionDateTime: Date(),
             typeId: 2,
@@ -66,7 +66,7 @@ struct CaptureTransactionMapperTests {
     
     @Test("CaptureTransactionMapper maps response with nil fields")
     func testCaptureTransactionMapperToModelWithNilFields() throws {
-        let response = Components.Schemas.PaymentGateway_Contracts_PublicApi_Isv_Transactions_IsvTransactionResponse(
+        let response = Components.Schemas.TransactionResponseIsvDto(
             transactionId: "txn-67890",
             transactionDateTime: Date(),
             typeId: 2,

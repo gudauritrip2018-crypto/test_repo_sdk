@@ -8,7 +8,7 @@ struct MapperErrorHandlingTests {
     @Test("DeviceMapper throws MapperError when deviceId is missing")
     func testDeviceMapperThrowsErrorOnMissingDeviceId() {
         // Create a DeviceResponse without deviceId
-        let deviceDto = Components.Schemas.PaymentGateway_Contracts_PublicApi_Isv_Devices_Get_DeviceResponse(
+        let deviceDto = Components.Schemas.DeviceResponseDto(
             deviceId: nil, // Missing required field
             deviceName: "Test Device",
             lastLoginAt: nil,
@@ -25,7 +25,7 @@ struct MapperErrorHandlingTests {
     
     @Test("DeviceMapper error message includes field name")
     func testDeviceMapperErrorMessageIncludesFieldName() {
-        let deviceDto = Components.Schemas.PaymentGateway_Contracts_PublicApi_Isv_Devices_Get_DeviceResponse(
+        let deviceDto = Components.Schemas.DeviceResponseDto(
             deviceId: nil,
             deviceName: "Test Device",
             lastLoginAt: nil,
@@ -48,7 +48,7 @@ struct MapperErrorHandlingTests {
     
     @Test("MapperError is properly propagated from mappers")
     func testMapperErrorPropagation() {
-        let deviceDto = Components.Schemas.PaymentGateway_Contracts_PublicApi_Isv_Devices_Get_DeviceResponse(
+        let deviceDto = Components.Schemas.DeviceResponseDto(
             deviceId: nil,
             deviceName: "Test Device",
             lastLoginAt: nil,
@@ -72,7 +72,7 @@ struct MapperErrorHandlingTests {
     
     @Test("MapperError can be caught and handled")
     func testMapperErrorCanBeCaught() {
-        let deviceDto = Components.Schemas.PaymentGateway_Contracts_PublicApi_Isv_Devices_Get_DeviceResponse(
+        let deviceDto = Components.Schemas.DeviceResponseDto(
             deviceId: nil,
             deviceName: "Test Device",
             lastLoginAt: nil,
@@ -98,7 +98,7 @@ struct MapperErrorHandlingTests {
     
     @Test("MapperError provides useful error information")
     func testMapperErrorProvidesUsefulInformation() {
-        let deviceDto = Components.Schemas.PaymentGateway_Contracts_PublicApi_Isv_Devices_Get_DeviceResponse(
+        let deviceDto = Components.Schemas.DeviceResponseDto(
             deviceId: nil,
             deviceName: "Test Device",
             lastLoginAt: nil,
@@ -124,7 +124,7 @@ struct MapperErrorHandlingTests {
     
     @Test("Multiple mapper errors can be distinguished")
     func testMultipleMapperErrorsAreDistinguishable() {
-        let deviceDto1 = Components.Schemas.PaymentGateway_Contracts_PublicApi_Isv_Devices_Get_DeviceResponse(
+        let deviceDto1 = Components.Schemas.DeviceResponseDto(
             deviceId: nil,
             deviceName: "Device 1",
             lastLoginAt: nil,
@@ -134,7 +134,7 @@ struct MapperErrorHandlingTests {
             userProfiles: nil
         )
         
-        let deviceDto2 = Components.Schemas.PaymentGateway_Contracts_PublicApi_Isv_Devices_Get_DeviceResponse(
+        let deviceDto2 = Components.Schemas.DeviceResponseDto(
             deviceId: nil,
             deviceName: "Device 2",
             lastLoginAt: nil,

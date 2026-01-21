@@ -7,7 +7,7 @@ struct TransactionSummaryMapperTests {
     
     @Test("TransactionSummaryMapper maps valid transaction summary")
     func testTransactionSummaryMapperValid() {
-        let amount = Components.Schemas.PaymentGateway_Contracts_Amounts_AmountDto(
+        let amount = Components.Schemas.IsvAmountDto(
             baseAmount: 100.0,
             percentageOffAmount: nil,
             percentageOffRate: nil,
@@ -22,26 +22,26 @@ struct TransactionSummaryMapperTests {
             totalAmount: 113.0
         )
         
-        let suggestedTip = Components.Schemas.PaymentGateway_Contracts_Amounts_SuggestedTipsDto(
+        let suggestedTip = Components.Schemas.SuggestedTipsIsvDto(
             tipPercent: 15.0,
             tipAmount: 7.5
         )
         
-        let availableOperation = Components.Schemas.PaymentGateway_Contracts_Transactions_GetPage_GetTransactionPageResponseDto_AvailableOperation(
+        let availableOperation = Components.Schemas.AvailableOperationDto(
             typeId: 1,
             _type: "void",
             availableAmount: 113.0,
             suggestedTips: [suggestedTip]
         )
         
-        let source = Components.Schemas.PaymentGateway_Contracts_SourceResponseDto(
+        let source = Components.Schemas.SourceResponseIsvDto(
             typeId: 1,
             _type: "pos",
             id: "source-1",
             name: "POS Terminal"
         )
         
-        let item = Components.Schemas.PaymentGateway_Contracts_PublicApi_Isv_Transactions_GetPage_GetIsvTransactionsResponse(
+        let item = Components.Schemas.GetIsvTransactionsResponseDto(
             id: "txn-123",
             paymentProcessorId: "processor-1",
             date: Date(),
@@ -95,7 +95,7 @@ struct TransactionSummaryMapperTests {
     
     @Test("TransactionSummaryMapper returns nil for missing id")
     func testTransactionSummaryMapperMissingId() {
-        let item = Components.Schemas.PaymentGateway_Contracts_PublicApi_Isv_Transactions_GetPage_GetIsvTransactionsResponse(
+        let item = Components.Schemas.GetIsvTransactionsResponseDto(
             id: nil,
             paymentProcessorId: nil,
             date: Date(),
@@ -133,7 +133,7 @@ struct TransactionSummaryMapperTests {
     
     @Test("TransactionSummaryMapper returns nil for empty id")
     func testTransactionSummaryMapperEmptyId() {
-        let item = Components.Schemas.PaymentGateway_Contracts_PublicApi_Isv_Transactions_GetPage_GetIsvTransactionsResponse(
+        let item = Components.Schemas.GetIsvTransactionsResponseDto(
             id: "",
             paymentProcessorId: nil,
             date: Date(),
@@ -171,7 +171,7 @@ struct TransactionSummaryMapperTests {
     
     @Test("TransactionSummaryMapper returns nil for missing merchantId")
     func testTransactionSummaryMapperMissingMerchantId() {
-        let item = Components.Schemas.PaymentGateway_Contracts_PublicApi_Isv_Transactions_GetPage_GetIsvTransactionsResponse(
+        let item = Components.Schemas.GetIsvTransactionsResponseDto(
             id: "txn-123",
             paymentProcessorId: nil,
             date: Date(),
@@ -209,7 +209,7 @@ struct TransactionSummaryMapperTests {
     
     @Test("TransactionSummaryMapper maps with default values")
     func testTransactionSummaryMapperWithDefaults() {
-        let amount = Components.Schemas.PaymentGateway_Contracts_Amounts_AmountDto(
+        let amount = Components.Schemas.IsvAmountDto(
             baseAmount: 50.0,
             percentageOffAmount: nil,
             percentageOffRate: nil,
@@ -224,14 +224,14 @@ struct TransactionSummaryMapperTests {
             totalAmount: 50.0
         )
         
-        let source = Components.Schemas.PaymentGateway_Contracts_SourceResponseDto(
+        let source = Components.Schemas.SourceResponseIsvDto(
             typeId: 1,
             _type: "pos",
             id: "source-default",
             name: "Default Source"
         )
         
-        let item = Components.Schemas.PaymentGateway_Contracts_PublicApi_Isv_Transactions_GetPage_GetIsvTransactionsResponse(
+        let item = Components.Schemas.GetIsvTransactionsResponseDto(
             id: "txn-default",
             paymentProcessorId: nil,
             date: Date(),
