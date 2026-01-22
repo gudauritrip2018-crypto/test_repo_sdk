@@ -137,22 +137,27 @@ jobs:
             echo "Highest production version: $HIGHEST_PROD_VERSION"
           fi
 
-          PLIST_VERSION=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" ios-sdk/src/AriseMobileSdk/AriseMobileSdk-Info.plist 2>/dev/null || echo "1.0.0")
-          PLIST_MAJOR=$(echo $PLIST_VERSION | cut -d. -f1)
-          echo "Info.plist version: $PLIST_VERSION (major: $PLIST_MAJOR)"
+          # Read version from project.pbxproj (MARKETING_VERSION)
+          PROJECT_VERSION=$(grep "MARKETING_VERSION" ios-sdk/src/AriseMobileSdk.xcodeproj/project.pbxproj | head -1 | sed 's/.*= *\([0-9.]*\).*/\1/' || echo "1.0.0")
+          if [ -z "$PROJECT_VERSION" ]; then
+            PROJECT_VERSION="1.0.0"
+          fi
+          echo "Project version: $PROJECT_VERSION"
 
           if [ -n "$HIGHEST_PROD_VERSION" ]; then
-            PROD_MAJOR=$(echo "$HIGHEST_PROD_VERSION" | cut -d. -f1)
+            # Compare full versions using sort -V
+            HIGHER_VERSION=$(printf '%s\n%s\n' "$PROJECT_VERSION" "$HIGHEST_PROD_VERSION" | sort -V | tail -1)
 
-            if [ "$PLIST_MAJOR" -gt "$PROD_MAJOR" ]; then
-              echo "Info.plist major ($PLIST_MAJOR) > production major ($PROD_MAJOR), using plist version"
-              BASE_VERSION="$PLIST_VERSION"
+            if [ "$PROJECT_VERSION" = "$HIGHER_VERSION" ] && [ "$PROJECT_VERSION" != "$HIGHEST_PROD_VERSION" ]; then
+              echo "Project version ($PROJECT_VERSION) > production version ($HIGHEST_PROD_VERSION), using project version"
+              BASE_VERSION="$PROJECT_VERSION"
             else
+              echo "Using production version: $HIGHEST_PROD_VERSION"
               BASE_VERSION="$HIGHEST_PROD_VERSION"
             fi
           else
-            echo "No production tags found, using plist version"
-            BASE_VERSION="$PLIST_VERSION"
+            echo "No production tags found, using project version"
+            BASE_VERSION="$PROJECT_VERSION"
           fi
 
           echo "Base version for pre-release: $BASE_VERSION"
