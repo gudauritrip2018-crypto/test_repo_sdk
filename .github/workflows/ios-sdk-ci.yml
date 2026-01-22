@@ -49,7 +49,7 @@ jobs:
         with:
           app-id: ${{ secrets.DISTRIBUTION_APP_ID }}
           private-key: ${{ secrets.DISTRIBUTION_APP_PRIVATE_KEY }}
-          owner: ${{ github.repository_owner }}
+          owner: ${{ secrets.DISTRIBUTION_REPO_OWNER }}
           repositories: ${{ secrets.DISTRIBUTION_REPO_NAME }}
 
       - name: Verify permissions
@@ -330,7 +330,7 @@ jobs:
         with:
           app-id: ${{ secrets.DISTRIBUTION_APP_ID }}
           private-key: ${{ secrets.DISTRIBUTION_APP_PRIVATE_KEY }}
-          owner: ${{ github.repository_owner }}
+          owner: ${{ secrets.DISTRIBUTION_REPO_OWNER }}
           repositories: ${{ secrets.DISTRIBUTION_REPO_NAME }}
 
       - name: Download Build Artifact
