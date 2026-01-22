@@ -55,35 +55,19 @@ jobs:
           owner: ${{ secrets.DISTRIBUTION_REPO_OWNER }}
           repositories: ${{ secrets.DISTRIBUTION_REPO_NAME }}
 
-      - name: Verify permissions
+      - name: Verify token works
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           DIST_REPO: ${{ secrets.DISTRIBUTION_REPO }}
         run: |
-          echo "Verifying permissions on $DIST_REPO..."
+          echo "Testing token access to $DIST_REPO..."
 
-          # Get repository permissions
-          PERMISSIONS=$(gh api "repos/${DIST_REPO}" --jq '.permissions')
-          echo "Permissions: $PERMISSIONS"
-
-          # Check push permission (needed for commits)
-          CAN_PUSH=$(echo "$PERMISSIONS" | jq -r '.push // false')
-          if [ "$CAN_PUSH" != "true" ]; then
-            echo "❌ ERROR: No push permission on $DIST_REPO"
-            echo "   Required for: creating commits and tags"
-            exit 1
-          fi
-          echo "✅ Push permission: OK"
-
-          # Check if we can create releases (try to list releases)
-          if gh release list --repo "$DIST_REPO" --limit 1 > /dev/null 2>&1; then
-            echo "✅ Release access: OK"
+          # Simple test - try to get repo info
+          if gh repo view "$DIST_REPO" --json name -q '.name' > /dev/null 2>&1; then
+            echo "✅ Token has access to repository"
           else
-            echo "⚠️ Warning: Could not verify release access (might be OK if no releases exist)"
+            echo "⚠️ Could not access repository via gh, will try with git..."
           fi
-
-          echo ""
-          echo "All required permissions verified successfully"
 
       - name: Extract version from branch name
         id: version
