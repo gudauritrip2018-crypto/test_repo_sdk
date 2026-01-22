@@ -225,6 +225,7 @@ jobs:
 
   test:
     needs: setup
+    if: needs.setup.outputs.dry_run != 'true'
     runs-on: macos-15
     timeout-minutes: 60
 
@@ -271,6 +272,7 @@ jobs:
 
   build:
     needs: setup
+    if: needs.setup.outputs.dry_run != 'true'
     runs-on: macos-15
     timeout-minutes: 30
 
@@ -337,6 +339,7 @@ jobs:
 
   release:
     needs: [setup, test, build]
+    if: always() && needs.setup.result == 'success' && (needs.setup.outputs.dry_run == 'true' || (needs.test.result == 'success' && needs.build.result == 'success'))
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
