@@ -82,8 +82,27 @@ jobs:
           echo ""
 
           echo "=== Testing git ls-remote ==="
+          echo "DIST_REPO for git: $DIST_REPO"
+          echo "URL format: https://x-access-token:***@github.com/${DIST_REPO}.git"
           REPO_URL="https://x-access-token:${DIST_REPO_TOKEN}@github.com/${DIST_REPO}.git"
           git ls-remote --heads "$REPO_URL" 2>&1 | head -5 || true
+          echo ""
+
+          echo "=== Testing with gh repo clone ==="
+          gh repo clone "$DIST_REPO" test-clone -- --depth=1 2>&1 || true
+          if [ -d "test-clone" ]; then
+            echo "✅ Clone successful!"
+            ls -la test-clone/
+            rm -rf test-clone
+          fi
+          echo ""
+
+          echo "=== Check DIST_REPO format ==="
+          if [[ "$DIST_REPO" == *"/"* ]]; then
+            echo "✅ DIST_REPO contains '/': looks like owner/repo format"
+          else
+            echo "❌ DIST_REPO does NOT contain '/': missing owner?"
+          fi
           echo ""
 
           echo "=== Debug complete ==="
