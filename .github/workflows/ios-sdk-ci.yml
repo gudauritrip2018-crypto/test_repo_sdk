@@ -52,19 +52,41 @@ jobs:
           owner: ${{ secrets.DISTRIBUTION_REPO_OWNER }}
           repositories: ${{ secrets.DISTRIBUTION_REPO_NAME }}
 
-      - name: Verify token works
+      - name: Debug token and access
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           DIST_REPO: ${{ secrets.DISTRIBUTION_REPO }}
+          DIST_REPO_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
-          echo "Testing token access to $DIST_REPO..."
+          echo "=== Debug Info ==="
+          echo ""
+          echo "DIST_REPO value: $DIST_REPO"
+          echo "Token length: ${#GH_TOKEN} characters"
+          echo "Token prefix: ${GH_TOKEN:0:10}..."
+          echo ""
 
-          # Simple test - try to get repo info
-          if gh repo view "$DIST_REPO" --json name -q '.name' > /dev/null 2>&1; then
-            echo "✅ Token has access to repository"
-          else
-            echo "⚠️ Could not access repository via gh, will try with git..."
-          fi
+          echo "=== Testing gh auth status ==="
+          gh auth status || true
+          echo ""
+
+          echo "=== Testing gh api /user ==="
+          gh api /user 2>&1 || true
+          echo ""
+
+          echo "=== Testing gh api /installation/repositories ==="
+          gh api /installation/repositories --jq '.repositories[].full_name' 2>&1 || true
+          echo ""
+
+          echo "=== Testing gh repo view ==="
+          gh repo view "$DIST_REPO" --json name 2>&1 || true
+          echo ""
+
+          echo "=== Testing git ls-remote ==="
+          REPO_URL="https://x-access-token:${DIST_REPO_TOKEN}@github.com/${DIST_REPO}.git"
+          git ls-remote --heads "$REPO_URL" 2>&1 | head -5 || true
+          echo ""
+
+          echo "=== Debug complete ==="
 
       - name: Calculate version
         id: version
