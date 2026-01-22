@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       dry_run:
-        description: 'Dry run mode (skip actual publishing)'
+        description: 'Dry run mode (skip commit, push and release creation)'
         required: false
         type: boolean
         default: true
@@ -36,7 +36,7 @@ jobs:
           DRY_RUN="${{ github.event.inputs.dry_run || 'true' }}"
           echo "dry_run=$DRY_RUN" >> $GITHUB_OUTPUT
           if [ "$DRY_RUN" = "true" ]; then
-            echo "🧪 DRY RUN MODE - No actual publishing will occur"
+            echo "🧪 DRY RUN MODE - Will skip commit, push and release creation"
           else
             echo "🚀 PRODUCTION MODE - Will publish to distribution repo"
           fi
@@ -48,7 +48,6 @@ jobs:
 
       - name: Generate GitHub App Token
         id: app-token
-        if: steps.check-mode.outputs.dry_run != 'true'
         uses: actions/create-github-app-token@v1
         with:
           app-id: ${{ secrets.DISTRIBUTION_APP_ID }}
@@ -56,10 +55,38 @@ jobs:
           owner: ${{ github.repository_owner }}
           repositories: ${{ secrets.DISTRIBUTION_REPO_NAME }}
 
+      - name: Verify permissions
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          DIST_REPO: ${{ secrets.DISTRIBUTION_REPO }}
+        run: |
+          echo "Verifying permissions on $DIST_REPO..."
+
+          # Get repository permissions
+          PERMISSIONS=$(gh api "repos/${DIST_REPO}" --jq '.permissions')
+          echo "Permissions: $PERMISSIONS"
+
+          # Check push permission (needed for commits)
+          CAN_PUSH=$(echo "$PERMISSIONS" | jq -r '.push // false')
+          if [ "$CAN_PUSH" != "true" ]; then
+            echo "❌ ERROR: No push permission on $DIST_REPO"
+            echo "   Required for: creating commits and tags"
+            exit 1
+          fi
+          echo "✅ Push permission: OK"
+
+          # Check if we can create releases (try to list releases)
+          if gh release list --repo "$DIST_REPO" --limit 1 > /dev/null 2>&1; then
+            echo "✅ Release access: OK"
+          else
+            echo "⚠️ Warning: Could not verify release access (might be OK if no releases exist)"
+          fi
+
+          echo ""
+          echo "All required permissions verified successfully"
+
       - name: Extract version from branch name
         id: version
-        env:
-          DRY_RUN: ${{ steps.check-mode.outputs.dry_run }}
         run: |
           BRANCH="${{ github.ref_name }}"
           echo "Branch: $BRANCH"
@@ -74,19 +101,9 @@ jobs:
             echo "version=$VERSION" >> $GITHUB_OUTPUT
             echo "tag=$TAG" >> $GITHUB_OUTPUT
           else
-            if [ "$DRY_RUN" = "true" ]; then
-              echo "🧪 DRY RUN: Branch name doesn't match release/X.Y.Z format"
-              echo "🧪 Using mock version for testing"
-              PLIST_VERSION=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" ios-sdk/src/AriseMobileSdk/AriseMobileSdk-Info.plist 2>/dev/null || echo "1.0.0")
-              VERSION="${PLIST_VERSION}-dry-run"
-              TAG="v${VERSION}"
-              echo "version=$VERSION" >> $GITHUB_OUTPUT
-              echo "tag=$TAG" >> $GITHUB_OUTPUT
-            else
-              echo "Error: Branch name must be in format 'release/X.Y.Z'"
-              echo "Current branch: $BRANCH"
-              exit 1
-            fi
+            echo "Error: Branch name must be in format 'release/X.Y.Z'"
+            echo "Current branch: $BRANCH"
+            exit 1
           fi
 
       - name: Generate changelog
@@ -94,20 +111,7 @@ jobs:
         env:
           DIST_REPO_TOKEN: ${{ steps.app-token.outputs.token }}
           DIST_REPO: ${{ secrets.DISTRIBUTION_REPO }}
-          DRY_RUN: ${{ steps.check-mode.outputs.dry_run }}
         run: |
-          if [ "$DRY_RUN" = "true" ]; then
-            echo "🧪 DRY RUN: Generating changelog from recent commits only"
-            CHANGELOG=$(git log --pretty=format:"- %s (%h)" --no-merges -- ios-sdk/ -10)
-            if [ -z "$CHANGELOG" ]; then
-              CHANGELOG="- Dry run test release"
-            fi
-            echo "changelog<<EOF" >> $GITHUB_OUTPUT
-            echo "$CHANGELOG" >> $GITHUB_OUTPUT
-            echo "EOF" >> $GITHUB_OUTPUT
-            exit 0
-          fi
-
           NOTES_FILE="${{ inputs.release_notes_file }}"
 
           # Use file only if path is provided AND file exists AND has content
@@ -285,14 +289,13 @@ jobs:
       - name: Check run mode
         run: |
           if [ "${{ needs.setup.outputs.dry_run }}" = "true" ]; then
-            echo "🧪 DRY RUN MODE - Simulating release steps"
+            echo "🧪 DRY RUN MODE - Will skip commit, push and release creation"
           else
             echo "🚀 PRODUCTION MODE - Publishing to distribution repo"
           fi
 
       - name: Generate GitHub App Token
         id: app-token
-        if: needs.setup.outputs.dry_run != 'true'
         uses: actions/create-github-app-token@v1
         with:
           app-id: ${{ secrets.DISTRIBUTION_APP_ID }}
@@ -312,7 +315,6 @@ jobs:
           ls -lhR distribution-files/
 
       - name: Setup Distribution Repository
-        if: needs.setup.outputs.dry_run != 'true'
         run: |
           REPO_URL="https://x-access-token:${{ steps.app-token.outputs.token }}@github.com/${{ secrets.DISTRIBUTION_REPO }}.git"
 
@@ -332,16 +334,6 @@ jobs:
           else
             git checkout -b release
           fi
-
-      - name: "[DRY RUN] Simulate Setup Distribution Repository"
-        if: needs.setup.outputs.dry_run == 'true'
-        run: |
-          echo "🧪 Would clone distribution repository: ${{ secrets.DISTRIBUTION_REPO }}"
-          echo "🧪 Would checkout 'release' branch"
-          mkdir -p distribution-repo
-          cd distribution-repo
-          git init
-          git checkout -b release
 
       - name: Configure Git
         working-directory: distribution-repo
@@ -364,38 +356,33 @@ jobs:
           echo "Files copied to distribution-repo:"
           ls -lhR distribution-repo/
 
-      - name: Commit and Push
-        if: needs.setup.outputs.dry_run != 'true'
+      - name: Commit Changes
         working-directory: distribution-repo
         run: |
           git add .
 
           if git diff --staged --quiet; then
-            echo "No changes"
+            echo "No changes to commit"
           else
             VERSION="${{ needs.setup.outputs.version }}"
             git commit -m "Release v${VERSION}"
-            git push -u origin release
-            echo "Pushed to release branch"
-          fi
-
-      - name: "[DRY RUN] Simulate Commit and Push"
-        if: needs.setup.outputs.dry_run == 'true'
-        working-directory: distribution-repo
-        run: |
-          git add .
-          if git diff --staged --quiet; then
-            echo "🧪 No changes to commit"
-          else
-            VERSION="${{ needs.setup.outputs.version }}"
-            git commit -m "Release v${VERSION}"
-            echo "🧪 Would push commit: Release v${VERSION}"
-            echo "🧪 Commit created locally (not pushed)"
+            echo "Commit created: Release v${VERSION}"
             git log -1 --oneline
           fi
 
-      - name: Create Tag
+      - name: Push Changes
         if: needs.setup.outputs.dry_run != 'true'
+        working-directory: distribution-repo
+        run: |
+          git push -u origin release
+          echo "Pushed to release branch"
+
+      - name: "[DRY RUN] Skip Push"
+        if: needs.setup.outputs.dry_run == 'true'
+        run: |
+          echo "🧪 DRY RUN: Skipping git push"
+
+      - name: Create Tag
         working-directory: distribution-repo
         run: |
           TAG="${{ needs.setup.outputs.tag }}"
@@ -404,21 +391,25 @@ jobs:
             git tag -d "$TAG"
           fi
 
-          if git ls-remote --tags origin "refs/tags/${TAG}" | grep -q .; then
-            echo "Tag $TAG already exists remotely, skipping"
-          else
-            git tag -a "$TAG" -m "Release $TAG"
-            git push origin "$TAG"
-            echo "Tag $TAG created"
-          fi
+          git tag -a "$TAG" -m "Release $TAG"
+          echo "Tag created locally: $TAG"
 
-      - name: "[DRY RUN] Simulate Create Tag"
-        if: needs.setup.outputs.dry_run == 'true'
+      - name: Push Tag
+        if: needs.setup.outputs.dry_run != 'true'
         working-directory: distribution-repo
         run: |
           TAG="${{ needs.setup.outputs.tag }}"
-          git tag -a "$TAG" -m "Release $TAG" 2>/dev/null || true
-          echo "🧪 Would create and push tag: $TAG"
+          if git ls-remote --tags origin "refs/tags/${TAG}" | grep -q .; then
+            echo "Tag $TAG already exists remotely, skipping"
+          else
+            git push origin "$TAG"
+            echo "Tag $TAG pushed"
+          fi
+
+      - name: "[DRY RUN] Skip Push Tag"
+        if: needs.setup.outputs.dry_run == 'true'
+        run: |
+          echo "🧪 DRY RUN: Skipping tag push for ${{ needs.setup.outputs.tag }}"
 
       - name: Find Archive
         id: archive
@@ -453,39 +444,24 @@ jobs:
           files: ${{ steps.archive.outputs.path }}
           draft: false
 
-      - name: "[DRY RUN] Simulate Create GitHub Release"
+      - name: "[DRY RUN] Skip Create GitHub Release"
         if: needs.setup.outputs.dry_run == 'true'
         run: |
-          echo "🧪 Would create GitHub Release:"
-          echo "   Repository: ${{ secrets.DISTRIBUTION_REPO }}"
-          echo "   Tag: ${{ needs.setup.outputs.tag }}"
-          echo "   Name: AriseMobileSdk ${{ needs.setup.outputs.tag }}"
-          echo "   Prerelease: false (Production Release)"
-          echo "   Archive: ${{ steps.archive.outputs.path }}"
+          echo "🧪 DRY RUN: Skipping GitHub Release creation"
           echo ""
-          echo "📝 Release body would be:"
-          echo "----------------------------------------"
-          echo "## AriseMobileSdk ${{ needs.setup.outputs.tag }}"
-          echo ""
-          echo "**Type:** Production Release"
-          echo ""
-          echo "### Changes"
-          echo ""
-          echo "${{ needs.setup.outputs.changelog }}"
-          echo ""
-          echo "### Installation"
-          echo ""
-          echo '```swift'
-          echo '.package(url: "https://github.com/${{ secrets.DISTRIBUTION_REPO }}.git", from: "${{ needs.setup.outputs.version }}")'
-          echo '```'
-          echo "----------------------------------------"
+          echo "Would create release:"
+          echo "  Repository: ${{ secrets.DISTRIBUTION_REPO }}"
+          echo "  Tag: ${{ needs.setup.outputs.tag }}"
+          echo "  Name: AriseMobileSdk ${{ needs.setup.outputs.tag }}"
+          echo "  Prerelease: false"
+          echo "  Archive: ${{ steps.archive.outputs.path }}"
 
       - name: Summary
         run: |
           echo "## Release Complete" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           if [ "${{ needs.setup.outputs.dry_run }}" = "true" ]; then
-            echo "⚠️ **DRY RUN MODE** - No actual publishing occurred" >> $GITHUB_STEP_SUMMARY
+            echo "⚠️ **DRY RUN MODE** - Commit, push and release creation were skipped" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
           fi
           echo "| Property | Value |" >> $GITHUB_STEP_SUMMARY
