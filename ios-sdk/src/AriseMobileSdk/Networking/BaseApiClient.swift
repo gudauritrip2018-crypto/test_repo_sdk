@@ -128,10 +128,16 @@ internal class BaseApiClient: @unchecked Sendable {
             // Create new client with current token
             // RequestLoggingMiddleware will log all HTTP requests
             // Use FlexibleISO8601DateTranscoder to handle dates with and without fractional seconds
+            // Configure URLSession with reasonable timeouts to avoid streaming race conditions
+            let sessionConfig = URLSessionConfiguration.default
+            sessionConfig.timeoutIntervalForRequest = 30
+            sessionConfig.timeoutIntervalForResource = 120
+            let session = URLSession(configuration: sessionConfig)
+
             let client = Client(
                 serverURL: serverURL,
                 configuration: Configuration(dateTranscoder: FlexibleISO8601DateTranscoder.shared),
-                transport: URLSessionTransport(),
+                transport: URLSessionTransport(configuration: .init(session: session)),
                 middlewares: [
                     RequestLoggingMiddleware(logger: self._logger),
                     AuthenticationMiddleware(token: currentToken),

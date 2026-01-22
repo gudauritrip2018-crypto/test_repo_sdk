@@ -353,9 +353,19 @@
 		FA451FB652E04F4F88F3321F /* TransactionsServiceProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransactionsServiceProtocol.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		DCA8FC6A2F2100E000668475 /* PBXFileSystemSynchronizedBuildFileExceptionSet */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = DCB03C382EB361E800E180BE /* AriseTestAppForDebug */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		DC9E058E2EE2E5D900BDF286 /* AriseMobileSdkTests */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = AriseMobileSdkTests; sourceTree = "<group>"; };
-		DCB03C3A2EB361E800E180BE /* AriseTestAppForDebug */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = AriseTestAppForDebug; sourceTree = "<group>"; };
+		DCB03C3A2EB361E800E180BE /* AriseTestAppForDebug */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (DCA8FC6A2F2100E000668475 /* PBXFileSystemSynchronizedBuildFileExceptionSet */, ); explicitFileTypes = {}; explicitFolders = (); path = AriseTestAppForDebug; sourceTree = "<group>"; };
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -1174,6 +1184,7 @@
 				INFOPLIST_FILE = "AriseMobileSdk/AriseMobileSdk-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = AriseMobile;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INFOPLIST_KEY_NSPrincipalClass = "";
 				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
 				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -1181,7 +1192,7 @@
 					"@executable_path/Frameworks",
 					"@loader_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.0.3;
+				MARKETING_VERSION = 1.0.0;
 				OTHER_LDFLAGS = "$(inherited)";
 				PRODUCT_BUNDLE_IDENTIFIER = com.arise.AriseMobile;
 				PRODUCT_MODULE_NAME = AriseMobile;
@@ -1212,6 +1223,7 @@
 				INFOPLIST_FILE = "AriseMobileSdk/AriseMobileSdk-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = AriseMobile;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INFOPLIST_KEY_NSPrincipalClass = "";
 				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
 				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -1219,7 +1231,7 @@
 					"@executable_path/Frameworks",
 					"@loader_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.0.3;
+				MARKETING_VERSION = 1.0.0;
 				OTHER_LDFLAGS = "$(inherited)";
 				PRODUCT_BUNDLE_IDENTIFIER = com.arise.AriseMobile;
 				PRODUCT_MODULE_NAME = AriseMobile;
@@ -1315,7 +1327,8 @@
 				DEVELOPMENT_TEAM = 69WQLJ9K8N;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = "$(PRODUCT_NAME)";
+				INFOPLIST_FILE = AriseTestAppForDebug/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = AriseTestAppForDebug;
 				INFOPLIST_KEY_CFBundleExecutable = "$(EXECUTABLE_NAME)";
 				INFOPLIST_KEY_CFBundleIdentifier = "$(PRODUCT_BUNDLE_IDENTIFIER)";
 				INFOPLIST_KEY_CFBundleName = "$(PRODUCT_NAME)";
@@ -1364,7 +1377,8 @@
 				DEVELOPMENT_TEAM = 69WQLJ9K8N;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = "$(PRODUCT_NAME)";
+				INFOPLIST_FILE = AriseTestAppForDebug/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = AriseTestAppForDebug;
 				INFOPLIST_KEY_CFBundleExecutable = "$(EXECUTABLE_NAME)";
 				INFOPLIST_KEY_CFBundleIdentifier = "$(PRODUCT_BUNDLE_IDENTIFIER)";
 				INFOPLIST_KEY_CFBundleName = "$(PRODUCT_NAME)";

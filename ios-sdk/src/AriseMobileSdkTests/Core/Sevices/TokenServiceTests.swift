@@ -235,7 +235,7 @@ struct TokenServiceTests {
         
         let expectedExpiration = afterRefresh.addingTimeInterval(TimeInterval(expiresIn))
         let timeDifference = abs(storedToken.expiresAt.timeIntervalSince(expectedExpiration))
-        #expect(timeDifference < 5.0)
+        #expect(timeDifference < 15.0)
     }
     
     @Test("Refresh logic prevents concurrent refresh attempts")

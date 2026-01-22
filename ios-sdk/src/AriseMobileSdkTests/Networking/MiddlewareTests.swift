@@ -204,12 +204,12 @@ struct MiddlewareTests {
             _ = try await middleware.intercept(request, body: nil, baseURL: baseURL, operationID: "test", next: next)
             Issue.record("Expected error")
         } catch let error as AriseApiError {
-            #expect(error.localizedDescription.contains("404") || error.localizedDescription.contains("Not found"))
+            #expect(error.localizedDescription.contains("404") || error.localizedDescription.contains("NotFound"))
         } catch {
             Issue.record("Unexpected error type: \(error)")
         }
     }
-    
+
     @Test("ErrorHandlingMiddleware converts 500 to AriseApiError")
     func testErrorHandlingMiddlewareConverts500() async {
         let logger = createMockLogger()
