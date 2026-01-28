@@ -37,18 +37,15 @@ jobs:
       - name: Calculate version
         id: version
         env:
-          DIST_REPO_TOKEN: ${{ steps.app-token.outputs.token }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
           DIST_REPO: ${{ secrets.DISTRIBUTION_REPO }}
         run: |
           echo "Fetching tags from distribution repository..."
 
-          REPO_URL="https://x-access-token:${DIST_REPO_TOKEN}@github.com/${DIST_REPO}.git"
-
-          # Clone bare repo to fetch tags (more reliable with credential helper)
           ALL_TAGS=""
           PRERELEASE_TAGS=""
 
-          if git clone --bare --filter=blob:none "$REPO_URL" dist-repo-version 2>/dev/null; then
+          if gh repo clone "$DIST_REPO" dist-repo-version -- --bare --filter=blob:none 2>/dev/null; then
             cd dist-repo-version
             echo "Fetched repository, listing tags..."
 
@@ -143,17 +140,15 @@ jobs:
       - name: Generate changelog
         id: changelog
         env:
-          DIST_REPO_TOKEN: ${{ steps.app-token.outputs.token }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
           DIST_REPO: ${{ secrets.DISTRIBUTION_REPO }}
         run: |
           echo "Generating changelog..."
 
-          REPO_URL="https://x-access-token:${DIST_REPO_TOKEN}@github.com/${DIST_REPO}.git"
-
           PREV_TAG=""
           PREV_TAG_DATE=""
 
-          if git clone --bare --filter=blob:none "$REPO_URL" dist-repo-changelog 2>/dev/null; then
+          if gh repo clone "$DIST_REPO" dist-repo-changelog -- --bare --filter=blob:none 2>/dev/null; then
             cd dist-repo-changelog
             PREV_TAG=$(git tag -l "v*-pre-release-*" | sort -V | tail -1)
 

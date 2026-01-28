@@ -1,0 +1,178 @@
+name: iOS SDK PR Check
+
+on:
+  pull_request:
+    paths:
+      - 'ios-sdk/**'
+      - '.github/workflows/ios-sdk-*.yml'
+
+jobs:
+  version-check:
+    name: Version & Changelog Preview
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate GitHub App Token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.DISTRIBUTION_APP_ID }}
+          private-key: ${{ secrets.DISTRIBUTION_APP_PRIVATE_KEY }}
+          owner: ${{ secrets.DISTRIBUTION_REPO_OWNER }}
+          repositories: ${{ secrets.DISTRIBUTION_REPO_NAME }}
+
+      - name: Calculate version
+        id: version
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          DIST_REPO: ${{ secrets.DISTRIBUTION_REPO }}
+        run: |
+          echo "Fetching tags from distribution repository..."
+
+          ALL_TAGS=""
+          PRERELEASE_TAGS=""
+
+          if gh repo clone "$DIST_REPO" dist-repo-version -- --bare --filter=blob:none 2>/dev/null; then
+            cd dist-repo-version
+            echo "Fetched repository, listing tags..."
+
+            ALL_TAGS=$(git tag -l "v*" | grep -v "pre-release" || echo "")
+            PRERELEASE_TAGS=$(git tag -l "v*-pre-release-*" || echo "")
+
+            cd ..
+            rm -rf dist-repo-version
+          else
+            echo "Warning: Failed to clone distribution repository"
+          fi
+
+          echo ""
+          echo "Production tags: ${ALL_TAGS:-none}"
+          echo "Pre-release tags: ${PRERELEASE_TAGS:-none}"
+
+          HIGHEST_PROD=$(echo "$ALL_TAGS" | sort -V | tail -1)
+          HIGHEST_PROD_VERSION=""
+          if [ -n "$HIGHEST_PROD" ]; then
+            HIGHEST_PROD_VERSION=$(echo "$HIGHEST_PROD" | sed 's/^v//')
+            echo "Highest production version: $HIGHEST_PROD_VERSION"
+          fi
+
+          HIGHEST_PRERELEASE=$(echo "$PRERELEASE_TAGS" | sort -V | tail -1)
+          HIGHEST_PRERELEASE_BASE=""
+          if [ -n "$HIGHEST_PRERELEASE" ]; then
+            HIGHEST_PRERELEASE_BASE=$(echo "$HIGHEST_PRERELEASE" | sed 's/^v//' | sed 's/-pre-release-.*//')
+            echo "Highest pre-release: $HIGHEST_PRERELEASE (base: $HIGHEST_PRERELEASE_BASE)"
+          fi
+
+          BASE_VERSION=""
+
+          if [ -n "$HIGHEST_PROD_VERSION" ] && [ -n "$HIGHEST_PRERELEASE_BASE" ]; then
+            HIGHER=$(printf '%s\n%s\n' "$HIGHEST_PROD_VERSION" "$HIGHEST_PRERELEASE_BASE" | sort -V | tail -1)
+            if [ "$HIGHER" = "$HIGHEST_PROD_VERSION" ] && [ "$HIGHEST_PROD_VERSION" != "$HIGHEST_PRERELEASE_BASE" ]; then
+              echo "Production version is higher, using: $HIGHEST_PROD_VERSION"
+              BASE_VERSION="$HIGHEST_PROD_VERSION"
+            else
+              echo "Pre-release base is higher or equal, using: $HIGHEST_PRERELEASE_BASE"
+              BASE_VERSION="$HIGHEST_PRERELEASE_BASE"
+            fi
+          elif [ -n "$HIGHEST_PROD_VERSION" ]; then
+            echo "Only production tags found, using: $HIGHEST_PROD_VERSION"
+            BASE_VERSION="$HIGHEST_PROD_VERSION"
+          elif [ -n "$HIGHEST_PRERELEASE_BASE" ]; then
+            echo "Only pre-release tags found, using base: $HIGHEST_PRERELEASE_BASE"
+            BASE_VERSION="$HIGHEST_PRERELEASE_BASE"
+          else
+            PROJECT_VERSION=$(grep "MARKETING_VERSION" ios-sdk/src/AriseMobileSdk.xcodeproj/project.pbxproj | head -1 | sed 's/.*= *\([0-9.]*\).*/\1/' || echo "")
+            if [ -z "$PROJECT_VERSION" ] || ! echo "$PROJECT_VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+              PROJECT_VERSION="0.0.1"
+            fi
+            echo "No tags found, using project version: $PROJECT_VERSION"
+            BASE_VERSION="$PROJECT_VERSION"
+          fi
+
+          echo "Base version for pre-release: $BASE_VERSION"
+
+          MATCHING_PRERELEASE=$(echo "$PRERELEASE_TAGS" | grep "^v${BASE_VERSION}-pre-release-" | sort -V | tail -1)
+
+          if [ -n "$MATCHING_PRERELEASE" ]; then
+            LAST_BUILD=$(echo "$MATCHING_PRERELEASE" | sed 's/.*-pre-release-//')
+            BUILD_NUMBER=$((LAST_BUILD + 1))
+            echo "Last pre-release for $BASE_VERSION: $MATCHING_PRERELEASE (build: $LAST_BUILD)"
+          else
+            BUILD_NUMBER=1
+            echo "No pre-releases for $BASE_VERSION, starting at build 1"
+          fi
+
+          VERSION="${BASE_VERSION}-pre-release-${BUILD_NUMBER}"
+          TAG="v${VERSION}"
+
+          echo ""
+          echo "Final version: $VERSION"
+          echo "Tag: $TAG"
+
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+
+      - name: Generate changelog
+        id: changelog
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          DIST_REPO: ${{ secrets.DISTRIBUTION_REPO }}
+        run: |
+          echo "Generating changelog..."
+
+          PREV_TAG=""
+          PREV_TAG_DATE=""
+
+          if gh repo clone "$DIST_REPO" dist-repo-changelog -- --bare --filter=blob:none 2>/dev/null; then
+            cd dist-repo-changelog
+            PREV_TAG=$(git tag -l "v*-pre-release-*" | sort -V | tail -1)
+
+            if [ -n "$PREV_TAG" ]; then
+              PREV_TAG_DATE=$(git log -1 --format="%ci" "$PREV_TAG" 2>/dev/null || echo "")
+            fi
+            cd ..
+            rm -rf dist-repo-changelog
+          fi
+
+          echo "Previous tag: ${PREV_TAG:-none}"
+          echo "Previous tag date: ${PREV_TAG_DATE:-none}"
+
+          if [ -n "$PREV_TAG_DATE" ]; then
+            echo "Getting commits since: $PREV_TAG_DATE"
+            CHANGELOG=$(git log --since="$PREV_TAG_DATE" --pretty=format:"- %s (%h)" --no-merges -- ios-sdk/ | head -30)
+          else
+            echo "No previous tag found, getting recent commits"
+            CHANGELOG=$(git log --pretty=format:"- %s (%h)" --no-merges -- ios-sdk/ -10)
+          fi
+
+          if [ -z "$CHANGELOG" ]; then
+            CHANGELOG="- Initial release"
+          fi
+
+          echo "Changelog:"
+          echo "$CHANGELOG"
+
+          echo "changelog<<EOF" >> $GITHUB_OUTPUT
+          echo "$CHANGELOG" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Summary
+        run: |
+          echo "## iOS SDK Pre-release Preview" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "When this PR is merged to main, the following pre-release will be created:" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Property | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Version | \`${{ steps.version.outputs.version }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Tag | \`${{ steps.version.outputs.tag }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Changelog" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "${{ steps.changelog.outputs.changelog }}" >> $GITHUB_STEP_SUMMARY
