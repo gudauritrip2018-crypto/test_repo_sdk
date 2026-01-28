@@ -9,12 +9,6 @@ on:
       - '.github/workflows/ios-sdk-ci.yml'
 
   workflow_dispatch:
-    inputs:
-      dry_run:
-        description: 'Dry run mode (skip commit, push and release creation)'
-        required: false
-        type: boolean
-        default: true
 
 jobs:
   setup:
@@ -24,20 +18,8 @@ jobs:
       version: ${{ steps.version.outputs.version }}
       tag: ${{ steps.version.outputs.tag }}
       changelog: ${{ steps.changelog.outputs.changelog }}
-      dry_run: ${{ steps.check-mode.outputs.dry_run }}
 
     steps:
-      - name: Check run mode
-        id: check-mode
-        run: |
-          DRY_RUN="${{ github.event.inputs.dry_run || 'true' }}"
-          echo "dry_run=$DRY_RUN" >> $GITHUB_OUTPUT
-          if [ "$DRY_RUN" = "true" ]; then
-            echo "🧪 DRY RUN MODE - Will skip commit, push and release creation"
-          else
-            echo "🚀 PRODUCTION MODE - Will publish to distribution repo"
-          fi
-
       - name: Checkout
         uses: actions/checkout@v4
         with:
@@ -52,61 +34,6 @@ jobs:
           owner: ${{ secrets.DISTRIBUTION_REPO_OWNER }}
           repositories: ${{ secrets.DISTRIBUTION_REPO_NAME }}
 
-      - name: Debug token and access
-        env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
-          DIST_REPO: ${{ secrets.DISTRIBUTION_REPO }}
-          DIST_REPO_TOKEN: ${{ steps.app-token.outputs.token }}
-        run: |
-          echo "=== Debug Info ==="
-          echo ""
-          echo "DIST_REPO value: $DIST_REPO"
-          echo "Token length: ${#GH_TOKEN} characters"
-          echo "Token prefix: ${GH_TOKEN:0:10}..."
-          echo ""
-
-          echo "=== Testing gh auth status ==="
-          gh auth status || true
-          echo ""
-
-          echo "=== Testing gh api /user ==="
-          gh api /user 2>&1 || true
-          echo ""
-
-          echo "=== Testing gh api /installation/repositories ==="
-          gh api /installation/repositories --jq '.repositories[].full_name' 2>&1 || true
-          echo ""
-
-          echo "=== Testing gh repo view ==="
-          gh repo view "$DIST_REPO" --json name 2>&1 || true
-          echo ""
-
-          echo "=== Testing git ls-remote ==="
-          echo "DIST_REPO for git: $DIST_REPO"
-          echo "URL format: https://x-access-token:***@github.com/${DIST_REPO}.git"
-          REPO_URL="https://x-access-token:${DIST_REPO_TOKEN}@github.com/${DIST_REPO}.git"
-          git ls-remote --heads "$REPO_URL" 2>&1 | head -5 || true
-          echo ""
-
-          echo "=== Testing with gh repo clone ==="
-          gh repo clone "$DIST_REPO" test-clone -- --depth=1 2>&1 || true
-          if [ -d "test-clone" ]; then
-            echo "✅ Clone successful!"
-            ls -la test-clone/
-            rm -rf test-clone
-          fi
-          echo ""
-
-          echo "=== Check DIST_REPO format ==="
-          if [[ "$DIST_REPO" == *"/"* ]]; then
-            echo "✅ DIST_REPO contains '/': looks like owner/repo format"
-          else
-            echo "❌ DIST_REPO does NOT contain '/': missing owner?"
-          fi
-          echo ""
-
-          echo "=== Debug complete ==="
-
       - name: Calculate version
         id: version
         env:
@@ -117,19 +44,30 @@ jobs:
 
           REPO_URL="https://x-access-token:${DIST_REPO_TOKEN}@github.com/${DIST_REPO}.git"
 
+          # Clone bare repo to fetch tags (more reliable with credential helper)
           ALL_TAGS=""
           PRERELEASE_TAGS=""
-          if git clone --bare --filter=blob:none "$REPO_URL" dist-repo-tags 2>/dev/null; then
-            cd dist-repo-tags
+
+          if git clone --bare --filter=blob:none "$REPO_URL" dist-repo-version 2>/dev/null; then
+            cd dist-repo-version
+            echo "Fetched repository, listing tags..."
+
+            # Get production tags (exclude pre-release)
             ALL_TAGS=$(git tag -l "v*" | grep -v "pre-release" || echo "")
+            # Get pre-release tags
             PRERELEASE_TAGS=$(git tag -l "v*-pre-release-*" || echo "")
+
             cd ..
-            rm -rf dist-repo-tags
+            rm -rf dist-repo-version
+          else
+            echo "Warning: Failed to clone distribution repository"
           fi
 
+          echo ""
           echo "Production tags: ${ALL_TAGS:-none}"
           echo "Pre-release tags: ${PRERELEASE_TAGS:-none}"
 
+          # Find highest production version
           HIGHEST_PROD=$(echo "$ALL_TAGS" | sort -V | tail -1)
           HIGHEST_PROD_VERSION=""
           if [ -n "$HIGHEST_PROD" ]; then
@@ -137,31 +75,50 @@ jobs:
             echo "Highest production version: $HIGHEST_PROD_VERSION"
           fi
 
-          # Read version from project.pbxproj (MARKETING_VERSION)
-          PROJECT_VERSION=$(grep "MARKETING_VERSION" ios-sdk/src/AriseMobileSdk.xcodeproj/project.pbxproj | head -1 | sed 's/.*= *\([0-9.]*\).*/\1/' || echo "1.0.0")
-          if [ -z "$PROJECT_VERSION" ]; then
-            PROJECT_VERSION="1.0.0"
+          # Find highest pre-release version (any base version)
+          HIGHEST_PRERELEASE=$(echo "$PRERELEASE_TAGS" | sort -V | tail -1)
+          HIGHEST_PRERELEASE_BASE=""
+          if [ -n "$HIGHEST_PRERELEASE" ]; then
+            # Extract base version from v0.0.3-pre-release-5 -> 0.0.3
+            HIGHEST_PRERELEASE_BASE=$(echo "$HIGHEST_PRERELEASE" | sed 's/^v//' | sed 's/-pre-release-.*//')
+            echo "Highest pre-release: $HIGHEST_PRERELEASE (base: $HIGHEST_PRERELEASE_BASE)"
           fi
-          echo "Project version: $PROJECT_VERSION"
 
-          if [ -n "$HIGHEST_PROD_VERSION" ]; then
-            # Compare full versions using sort -V
-            HIGHER_VERSION=$(printf '%s\n%s\n' "$PROJECT_VERSION" "$HIGHEST_PROD_VERSION" | sort -V | tail -1)
+          # Determine base version:
+          # 1. If there's a production release higher than any pre-release base, use production version
+          # 2. Otherwise use the highest pre-release base version
+          # 3. Fallback to project version
+          BASE_VERSION=""
 
-            if [ "$PROJECT_VERSION" = "$HIGHER_VERSION" ] && [ "$PROJECT_VERSION" != "$HIGHEST_PROD_VERSION" ]; then
-              echo "Project version ($PROJECT_VERSION) > production version ($HIGHEST_PROD_VERSION), using project version"
-              BASE_VERSION="$PROJECT_VERSION"
-            else
-              echo "Using production version: $HIGHEST_PROD_VERSION"
+          if [ -n "$HIGHEST_PROD_VERSION" ] && [ -n "$HIGHEST_PRERELEASE_BASE" ]; then
+            # Compare production vs pre-release base
+            HIGHER=$(printf '%s\n%s\n' "$HIGHEST_PROD_VERSION" "$HIGHEST_PRERELEASE_BASE" | sort -V | tail -1)
+            if [ "$HIGHER" = "$HIGHEST_PROD_VERSION" ] && [ "$HIGHEST_PROD_VERSION" != "$HIGHEST_PRERELEASE_BASE" ]; then
+              echo "Production version is higher, using: $HIGHEST_PROD_VERSION"
               BASE_VERSION="$HIGHEST_PROD_VERSION"
+            else
+              echo "Pre-release base is higher or equal, using: $HIGHEST_PRERELEASE_BASE"
+              BASE_VERSION="$HIGHEST_PRERELEASE_BASE"
             fi
+          elif [ -n "$HIGHEST_PROD_VERSION" ]; then
+            echo "Only production tags found, using: $HIGHEST_PROD_VERSION"
+            BASE_VERSION="$HIGHEST_PROD_VERSION"
+          elif [ -n "$HIGHEST_PRERELEASE_BASE" ]; then
+            echo "Only pre-release tags found, using base: $HIGHEST_PRERELEASE_BASE"
+            BASE_VERSION="$HIGHEST_PRERELEASE_BASE"
           else
-            echo "No production tags found, using project version"
+            # Fallback to project version
+            PROJECT_VERSION=$(grep "MARKETING_VERSION" ios-sdk/src/AriseMobileSdk.xcodeproj/project.pbxproj | head -1 | sed 's/.*= *\([0-9.]*\).*/\1/' || echo "")
+            if [ -z "$PROJECT_VERSION" ] || ! echo "$PROJECT_VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+              PROJECT_VERSION="0.0.1"
+            fi
+            echo "No tags found, using project version: $PROJECT_VERSION"
             BASE_VERSION="$PROJECT_VERSION"
           fi
 
           echo "Base version for pre-release: $BASE_VERSION"
 
+          # Find last pre-release number for this base version
           MATCHING_PRERELEASE=$(echo "$PRERELEASE_TAGS" | grep "^v${BASE_VERSION}-pre-release-" | sort -V | tail -1)
 
           if [ -n "$MATCHING_PRERELEASE" ]; then
@@ -176,6 +133,7 @@ jobs:
           VERSION="${BASE_VERSION}-pre-release-${BUILD_NUMBER}"
           TAG="v${VERSION}"
 
+          echo ""
           echo "Final version: $VERSION"
           echo "Tag: $TAG"
 
@@ -255,7 +213,20 @@ jobs:
 
       - name: Boot Simulator
         run: |
-          SIMULATOR_ID=$(xcrun simctl list devices available | grep "iPhone" | head -1 | sed 's/.*(\([A-F0-9-]*\)).*/\1/')
+          # Extract simulator ID with validation
+          SIMULATOR_LINE=$(xcrun simctl list devices available | grep "iPhone" | head -1)
+          if [ -z "$SIMULATOR_LINE" ]; then
+            echo "Error: No iPhone simulator found"
+            exit 1
+          fi
+
+          SIMULATOR_ID=$(echo "$SIMULATOR_LINE" | grep -oE '[A-F0-9]{8}-[A-F0-9]{4}-[A-F0-9]{4}-[A-F0-9]{4}-[A-F0-9]{12}')
+          if [ -z "$SIMULATOR_ID" ]; then
+            echo "Error: Could not extract simulator ID from: $SIMULATOR_LINE"
+            exit 1
+          fi
+
+          echo "Booting simulator: $SIMULATOR_ID"
           xcrun simctl boot "$SIMULATOR_ID" 2>/dev/null || true
           echo "Simulator ready"
 
@@ -314,8 +285,8 @@ jobs:
         run: |
           mkdir -p ios-sdk/Distribution/libs
 
-          if [ -d "ios-sdk/libs/AriseMobile.xcframework" ]; then
-            cp -R ios-sdk/libs/AriseMobile.xcframework ios-sdk/Distribution/libs/
+          if [ -d "ios-sdk/libs/ARISE.xcframework" ]; then
+            cp -R ios-sdk/libs/ARISE.xcframework ios-sdk/Distribution/libs/
           fi
 
           if [ -d "ios-sdk/libs/CloudCommerce.xcframework" ]; then
@@ -342,19 +313,10 @@ jobs:
 
   release:
     needs: [setup, test, build]
-    if: needs.setup.result == 'success' && needs.test.result == 'success' && needs.build.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
     steps:
-      - name: Check run mode
-        run: |
-          if [ "${{ needs.setup.outputs.dry_run }}" = "true" ]; then
-            echo "🧪 DRY RUN MODE - Will skip commit, push and release creation"
-          else
-            echo "🚀 PRODUCTION MODE - Publishing to distribution repo"
-          fi
-
       - name: Generate GitHub App Token
         id: app-token
         uses: actions/create-github-app-token@v1
@@ -370,16 +332,13 @@ jobs:
           name: ios-sdk-build
           path: distribution-files/
 
-      - name: List Build Artifacts
-        run: |
-          echo "📦 Build artifacts:"
-          ls -lhR distribution-files/
-
       - name: Setup Distribution Repository
+        env:
+          GIT_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
-          REPO_URL="https://x-access-token:${{ steps.app-token.outputs.token }}@github.com/${{ secrets.DISTRIBUTION_REPO }}.git"
+          REPO_URL="https://x-access-token:${GIT_TOKEN}@github.com/${{ secrets.DISTRIBUTION_REPO }}.git"
 
-          git clone --depth=1 "$REPO_URL" distribution-repo 2>/dev/null || {
+          git clone "$REPO_URL" distribution-repo 2>/dev/null || {
             mkdir distribution-repo
             cd distribution-repo
             git init
@@ -390,6 +349,7 @@ jobs:
           cd distribution-repo
           git fetch origin --tags 2>/dev/null || true
           git checkout main 2>/dev/null || git checkout -b main
+          git pull origin main 2>/dev/null || true
 
       - name: Configure Git
         working-directory: distribution-repo
@@ -409,73 +369,69 @@ jobs:
           rm -rf distribution-repo/libs/*
           cp -R distribution-files/libs/* distribution-repo/libs/
 
-          echo "Files copied to distribution-repo:"
-          ls -lhR distribution-repo/
+          echo "Files copied"
 
-      - name: Commit Changes
+      - name: Commit and Push
         working-directory: distribution-repo
         run: |
           git add .
 
           if git diff --staged --quiet; then
-            echo "No changes to commit"
+            echo "No changes"
           else
             VERSION="${{ needs.setup.outputs.version }}"
             git commit -m "Pre-release v${VERSION}"
-            echo "Commit created: Pre-release v${VERSION}"
-            git log -1 --oneline
+
+            # Pull with rebase to handle concurrent pushes, then push with retry
+            MAX_RETRIES=3
+            for i in $(seq 1 $MAX_RETRIES); do
+              git pull --rebase origin main 2>/dev/null || true
+              if git push -u origin main; then
+                echo "Pushed successfully"
+                break
+              fi
+              if [ $i -eq $MAX_RETRIES ]; then
+                echo "Failed to push after $MAX_RETRIES attempts"
+                exit 1
+              fi
+              echo "Push failed, retrying ($i/$MAX_RETRIES)..."
+              sleep 2
+            done
           fi
-
-      - name: Push Changes
-        if: needs.setup.outputs.dry_run != 'true'
-        working-directory: distribution-repo
-        run: |
-          git push -u origin main
-          echo "Pushed to main"
-
-      - name: "[DRY RUN] Skip Push"
-        if: needs.setup.outputs.dry_run == 'true'
-        run: |
-          echo "🧪 DRY RUN: Skipping git push"
 
       - name: Create Tag
         working-directory: distribution-repo
         run: |
           TAG="${{ needs.setup.outputs.tag }}"
 
-          if git rev-parse "$TAG" >/dev/null 2>&1; then
-            git tag -d "$TAG"
-          fi
+          # Delete local tag if exists
+          git tag -d "$TAG" 2>/dev/null || true
 
+          # Atomic tag creation: create and push, handle failure gracefully
           git tag -a "$TAG" -m "Pre-release $TAG"
-          echo "Tag created locally: $TAG"
-
-      - name: Push Tag
-        if: needs.setup.outputs.dry_run != 'true'
-        working-directory: distribution-repo
-        run: |
-          TAG="${{ needs.setup.outputs.tag }}"
-          if git ls-remote --tags origin "refs/tags/${TAG}" | grep -q .; then
-            echo "Tag $TAG already exists remotely, skipping"
+          if git push origin "$TAG" 2>&1; then
+            echo "Tag $TAG created"
           else
-            git push origin "$TAG"
-            echo "Tag $TAG pushed"
+            echo "Tag $TAG already exists or push failed, skipping"
+            git tag -d "$TAG" 2>/dev/null || true
           fi
-
-      - name: "[DRY RUN] Skip Push Tag"
-        if: needs.setup.outputs.dry_run == 'true'
-        run: |
-          echo "🧪 DRY RUN: Skipping tag push for ${{ needs.setup.outputs.tag }}"
 
       - name: Find Archive
         id: archive
         run: |
-          ARCHIVE=$(ls distribution-files/*.zip 2>/dev/null | head -1)
+          # Find zip files with validation
+          ARCHIVE=$(find distribution-files -maxdepth 1 -name "*.zip" -type f 2>/dev/null | head -1)
+
+          if [ -z "$ARCHIVE" ] || [ ! -f "$ARCHIVE" ]; then
+            echo "Error: No zip archive found in distribution-files/"
+            ls -la distribution-files/ || true
+            exit 1
+          fi
+
           echo "path=$ARCHIVE" >> $GITHUB_OUTPUT
           echo "Archive: $ARCHIVE"
 
       - name: Create GitHub Release
-        if: needs.setup.outputs.dry_run != 'true'
         uses: softprops/action-gh-release@v1
         with:
           repository: ${{ secrets.DISTRIBUTION_REPO }}
@@ -500,20 +456,7 @@ jobs:
           files: ${{ steps.archive.outputs.path }}
           draft: false
 
-      - name: "[DRY RUN] Skip Create GitHub Release"
-        if: needs.setup.outputs.dry_run == 'true'
-        run: |
-          echo "🧪 DRY RUN: Skipping GitHub Release creation"
-          echo ""
-          echo "Would create release:"
-          echo "  Repository: ${{ secrets.DISTRIBUTION_REPO }}"
-          echo "  Tag: ${{ needs.setup.outputs.tag }}"
-          echo "  Name: AriseMobileSdk ${{ needs.setup.outputs.tag }}"
-          echo "  Prerelease: true"
-          echo "  Archive: ${{ steps.archive.outputs.path }}"
-
       - name: Cleanup Old Pre-releases
-        if: needs.setup.outputs.dry_run != 'true'
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
@@ -528,6 +471,7 @@ jobs:
           echo "Raw releases:"
           echo "$RAW_RELEASES" | head -20
 
+          # Get ALL pre-releases (by isPrerelease flag), sorted by date (oldest first)
           RELEASES=$(echo "$RAW_RELEASES" | jq -r '.[] | select(.isPrerelease == true) | .tagName + " " + .createdAt' | sort -k2 | awk '{print $1}')
 
           if [ -z "$RELEASES" ]; then
@@ -561,21 +505,11 @@ jobs:
             echo "No cleanup needed (have $COUNT, keeping 5)"
           fi
 
-      - name: "[DRY RUN] Skip Cleanup Old Pre-releases"
-        if: needs.setup.outputs.dry_run == 'true'
-        run: |
-          echo "🧪 DRY RUN: Skipping cleanup of old pre-releases"
-
       - name: Summary
         run: |
           echo "## Release Complete" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          if [ "${{ needs.setup.outputs.dry_run }}" = "true" ]; then
-            echo "⚠️ **DRY RUN MODE** - Commit, push and release creation were skipped" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-          fi
           echo "| Property | Value |" >> $GITHUB_STEP_SUMMARY
           echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
           echo "| Version | ${{ needs.setup.outputs.version }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Tag | ${{ needs.setup.outputs.tag }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Dry Run | ${{ needs.setup.outputs.dry_run }} |" >> $GITHUB_STEP_SUMMARY

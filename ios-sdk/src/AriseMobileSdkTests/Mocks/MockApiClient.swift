@@ -1,7 +1,7 @@
 import Foundation
 import OpenAPIURLSession
 import OpenAPIRuntime
-@testable import AriseMobile
+@testable import ARISE
 
 /// Mock API client for network testing
 /// This is a simplified mock that can be extended based on specific test needs

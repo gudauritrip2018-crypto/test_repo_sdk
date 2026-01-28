@@ -1,6 +1,6 @@
 import Foundation
 import Testing
-@testable import AriseMobile
+@testable import ARISE
 
 /// Tests for Settings Mappers functionality
 struct SettingsMappersTests {
@@ -52,7 +52,6 @@ struct SettingsMappersTests {
             isTipsEnabled: true,
             availablePaymentProcessors: [processorDto],
             avs: avsOptions,
-            isCustomerCardSavingByTerminalEnabled: false,
             companyName: "Test Company",
             mccCode: "1234",
             mccCodeDescription: nil,
@@ -186,7 +185,6 @@ struct SettingsMappersTests {
             isTipsEnabled: false,
             availablePaymentProcessors: [],
             avs: nil,
-            isCustomerCardSavingByTerminalEnabled: false,
             companyName: nil,
             mccCode: nil,
             mccCodeDescription: nil,
@@ -223,7 +221,6 @@ struct SettingsMappersTests {
             isTipsEnabled: false,
             availablePaymentProcessors: [],
             avs: nil,
-            isCustomerCardSavingByTerminalEnabled: false,
             companyName: "Test",
             mccCode: "1234",
             mccCodeDescription: nil,

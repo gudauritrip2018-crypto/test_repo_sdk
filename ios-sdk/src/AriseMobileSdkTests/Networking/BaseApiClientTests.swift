@@ -2,7 +2,7 @@ import Foundation
 import Testing
 import OpenAPIRuntime
 import HTTPTypes
-@testable import AriseMobile
+@testable import ARISE
 
 /// Test implementation of BaseApiClient for testing
 final class TestBaseApiClient: BaseApiClient {

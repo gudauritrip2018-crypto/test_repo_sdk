@@ -1,5 +1,5 @@
 import SwiftUI
-import AriseMobile
+import ARISE
 import CoreLocation
 import Combine
 import UIKit
@@ -1087,11 +1087,10 @@ struct TTPHubView: View {
             // First, calculate amount to get breakdown
             let calculateRequest = CalculateAmountRequest(
                 amount: NSDecimalNumber(decimal: amount).doubleValue,
+                currencyId: 1
 //                percentageOffRate: 30.0,
 //                surchargeRate: 4,
-//                tipAmount: 10.0,
-                currencyId: 1
-                
+//                tipAmount: 10.0
             )
             
             let calculation = try await ariseSdk.calculateAmount(request: calculateRequest)

@@ -199,17 +199,18 @@ public class AriseMobileSdk {
     /// - Parameters:
     ///   - clientId: Client identifier issued in the ARISE merchant portal.
     ///   - clientSecret: Client secret paired with the client identifier.
-    /// - Returns: `AuthenticationResult` containing access token, refresh token, and expiration metadata.
+    /// - Returns: `true` if authentication succeeded.
     /// - Throws: `AuthenticationError` when ARISE rejects the credentials or the network request fails.
     ///
     /// Example usage:
     /// ```swift
-    /// let auth = try await ariseSdk.authenticate(clientId: "merchant-id", clientSecret: "secret")
-    /// print("Access token expires at \(auth.expirationDate)")
+    /// let success = try await ariseSdk.authenticate(clientId: "merchant-id", clientSecret: "secret")
+    /// print("Authenticated: \(success)")
     /// ```
-    public func authenticate(clientId: String, clientSecret: String) async throws -> AuthenticationResult {
-       
-        return try await _tokenService.authenticate(clientId: clientId, clientSecret: clientSecret)
+    @discardableResult
+    public func authenticate(clientId: String, clientSecret: String) async throws -> Bool {
+        _ = try await _tokenService.authenticate(clientId: clientId, clientSecret: clientSecret)
+        return true
     }
     
     /// Returns the list of enabled API permissions for the currently authenticated user.
@@ -308,17 +309,18 @@ public class AriseMobileSdk {
 
     /// Exchanges the refresh token for a new ARISE access token.
     ///
-    /// - Returns: Updated `AuthenticationResult` containing fresh tokens.
+    /// - Returns: `true` if token refresh succeeded.
     /// - Throws: `AuthenticationError` if the refresh token is missing, expired, or invalid.
     ///
     /// Example usage:
     /// ```swift
-    /// let refreshed = try await ariseSdk.refreshAccessToken()
-    /// print("New access token: \(refreshed.accessToken)")
+    /// let success = try await ariseSdk.refreshAccessToken()
+    /// print("Token refreshed: \(success)")
     /// ```
-    public func refreshAccessToken() async throws -> AuthenticationResult {
-        
-        return try await _tokenService.refreshToken()
+    @discardableResult
+    public func refreshAccessToken() async throws -> Bool {
+        _ = try await _tokenService.refreshToken()
+        return true
     }
     
     /// Retrieves a paginated list of transactions from the ARISE API.
@@ -335,8 +337,8 @@ public class AriseMobileSdk {
     /// let filters = try TransactionFilters(
     ///     page: 0,
     ///     pageSize: 20,
-    ///     asc: true,
     ///     orderBy: "date",
+    ///     asc: true,
     ///     batchId: "d6fdd754-c287-4c61-84ff-55d8bc5ad5fb"
     /// )
     /// let result = try await ariseSdk.getTransactions(filters: filters)
@@ -403,7 +405,7 @@ public class AriseMobileSdk {
     /// print("Status: \(result.status ?? "N/A")")
     /// print("Auth Code: \(result.authorizationCode ?? "N/A")")
     /// ```
-    public func submitAuthTransaction(input: AuthorizationRequest) async throws -> AuthorizationResponse {
+    public func submitAuthTransaction(input: CardTransactionRequest) async throws -> CardTransactionResponse {
         return try await _transactionsService.submitAuthTransaction(request: input)
     }
     
@@ -432,7 +434,7 @@ public class AriseMobileSdk {
     /// print("Status: \(result.status ?? "N/A")")
     /// print("Total: \(result.transactionReceipt?.amount?.totalAmount ?? 0)")
     /// ```
-    public func submitSaleTransaction(input: AuthorizationRequest) async throws -> AuthorizationResponse {
+    public func submitSaleTransaction(input: CardTransactionRequest) async throws -> CardTransactionResponse {
         return try await _transactionsService.submitSaleTransaction(request: input)
     }
     
@@ -445,15 +447,14 @@ public class AriseMobileSdk {
     ///
     /// Example usage:
     /// ```swift
-    /// let calculation = try await ariseSdk.calculateAmount(
-    ///     request: CalculateAmountRequest(
-    ///         amount: 100.0,
-    ///         percentageOffRate: 5.0,
-    ///         surchargeRate: 3.0,
-    ///         tipAmount: 10.0,
-    ///         useCardPrice: true
-    ///     )
+    /// let request = CalculateAmountRequest(
+    ///     amount: 100.0,
+    ///     percentageOffRate: 5.0,
+    ///     surchargeRate: 3.0,
+    ///     tipAmount: 10.0,
+    ///     useCardPrice: true
     /// )
+    /// let calculation = try await ariseSdk.calculateAmount(request: request)
     /// print("Card total: \(calculation.creditCard?.totalAmount ?? 0)")
     /// print("Cash total: \(calculation.cash?.totalAmount ?? 0)")
     /// ```

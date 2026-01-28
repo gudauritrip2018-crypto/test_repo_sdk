@@ -8,7 +8,7 @@
 import Foundation
 
 typealias GeneratedIsvAuthorizationResponse = Components.Schemas.AuthorizationResponseDto
-typealias IsvAuthorizationResult = AuthorizationResponse
+typealias IsvAuthorizationResult = CardTransactionResponse
 
 internal struct IsvAuthorizationResultMapper {
     /// Convert shared authorization/sale response body into SDK model.

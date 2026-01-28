@@ -1,5 +1,5 @@
 import Foundation
-@testable import AriseMobile
+@testable import ARISE
 
 /// Mock implementation of SettingsServiceProtocol for testing
 final class MockSettingsService: SettingsServiceProtocol {
@@ -19,7 +19,6 @@ final class MockSettingsService: SettingsServiceProtocol {
             availableTransactionTypes: [],
             availablePaymentProcessors: [],
             avs: nil,
-            isCustomerCardSavingByTerminalEnabled: false,
             companyName: "Mock Company",
             mccCode: "1234",
             currencyCode: "USD",

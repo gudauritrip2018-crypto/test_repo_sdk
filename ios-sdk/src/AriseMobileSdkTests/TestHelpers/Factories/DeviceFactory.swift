@@ -1,5 +1,5 @@
 import Foundation
-@testable import AriseMobile
+@testable import ARISE
 
 /// Factory for creating test device data
 enum DeviceFactory {

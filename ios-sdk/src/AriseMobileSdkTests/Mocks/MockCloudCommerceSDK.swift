@@ -1,6 +1,6 @@
 import Foundation
 import CloudCommerce
-@testable import AriseMobile
+@testable import ARISE
 
 /// Helper function to create default SdkUpgradeResponse for testing
 private func createDefaultSdkUpgradeResponse() -> Result<CloudCommerce.SdkUpgradeResponse, Error> {

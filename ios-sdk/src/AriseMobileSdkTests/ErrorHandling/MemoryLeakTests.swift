@@ -1,6 +1,6 @@
 import Foundation
 import Testing
-@testable import AriseMobile
+@testable import ARISE
 
 /// Tests for memory leaks and retain cycles
 struct MemoryLeakTests {
@@ -50,8 +50,8 @@ struct MemoryLeakTests {
         let filters = try TransactionFilters(
             page: 1,
             pageSize: 20,
-            asc: true,
             orderBy: nil,
+            asc: true,
             createMethodId: nil,
             createdById: nil,
             batchId: nil,

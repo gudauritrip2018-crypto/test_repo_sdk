@@ -1,5 +1,5 @@
 import Foundation
-@testable import AriseMobile
+@testable import ARISE
 
 /// Factory for creating test transaction data
 enum TransactionFactory {
@@ -89,8 +89,8 @@ enum TransactionFactory {
         paymentProcessorId: String = "test-processor-id",
         currencyId: Int32 = 840,
         cardDataSource: CardDataSource = .swipe
-    ) throws -> AuthorizationRequest {
-        return try AuthorizationRequest(
+    ) throws -> CardTransactionRequest {
+        return try CardTransactionRequest(
             paymentProcessorId: paymentProcessorId,
             amount: amount,
             currencyId: currencyId,

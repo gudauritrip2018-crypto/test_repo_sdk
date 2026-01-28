@@ -1,6 +1,6 @@
 import Foundation
 import Testing
-@testable import AriseMobile
+@testable import ARISE
 
 /// End-to-End Integration Flow Tests
 /// 
@@ -45,8 +45,7 @@ struct EndToEndIntegrationTests {
         let clientId = "test-client-id"
         let clientSecret = "test-client-secret"
         let result = try await sdk.authenticate(clientId: clientId, clientSecret: clientSecret)
-        #expect(result.accessToken == "initial-access-token")
-        #expect(result.refreshToken == "refresh-token-123")
+        #expect(result == true)
         #expect(mockAuthApi.authenticateCallCount == 1)
         
         // Step 2: Get access token
@@ -63,7 +62,7 @@ struct EndToEndIntegrationTests {
         mockAuthApi.refreshTokenResult = .success(refreshResult)
         
         let refreshed = try await sdk.refreshAccessToken()
-        #expect(refreshed.accessToken == "refreshed-access-token")
+        #expect(refreshed == true)
         #expect(mockAuthApi.refreshTokenCallCount == 1)
         
         // Verify new token is accessible
@@ -163,8 +162,10 @@ struct EndToEndIntegrationTests {
         mockAuthApi.authenticateResult = .success(reAuthResult)
         
         let reAuth = try await sdk.authenticate(clientId: "test-client-id", clientSecret: "test-client-secret")
-        #expect(reAuth.accessToken == "new-access-token")
+        #expect(reAuth == true)
         #expect(mockAuthApi.authenticateCallCount == 2)
+        let reAuthToken = await sdk.getAccessToken()
+        #expect(reAuthToken == "new-access-token")
     }
     
     @Test("Concurrent authentication attempts")
@@ -198,20 +199,21 @@ struct EndToEndIntegrationTests {
         )
         
         // Perform concurrent authentication attempts
-        try await withThrowingTaskGroup(of: AuthenticationResult.self) { group in
+        try await withThrowingTaskGroup(of: Bool.self) { group in
             for i in 0..<5 {
                 group.addTask {
                     try await sdk.authenticate(clientId: "client-\(i)", clientSecret: "secret-\(i)")
                 }
             }
-            
-            var results: [AuthenticationResult] = []
+
+            var results: [Bool] = []
             for try await result in group {
                 results.append(result)
             }
-            
+
             // All should succeed (though behavior depends on implementation)
             #expect(results.count == 5)
+            #expect(results.allSatisfy { $0 == true })
         }
     }
     
@@ -311,18 +313,18 @@ struct EndToEndIntegrationTests {
         _ = try await sdk.authenticate(clientId: "test-client-id", clientSecret: "test-client-secret")
         
         // Step 2: Submit sale transaction
-        let saleRequest = try AuthorizationRequest(
+        let saleRequest = try CardTransactionRequest(
             paymentProcessorId: "processor-id",
             amount: 100.0,
             currencyId: 1,
             cardDataSource: .manual,
             accountNumber: "4111111111111111",
-            securityCode: "123",
             expirationMonth: 12,
-            expirationYear: 25
+            expirationYear: 25,
+            securityCode: "123"
         )
         
-        let saleResponse = AuthorizationResponse(
+        let saleResponse = CardTransactionResponse(
             transactionId: "sale-transaction-id",
             transactionDateTime: Date(),
             typeId: 2,
@@ -410,18 +412,18 @@ struct EndToEndIntegrationTests {
         _ = try await sdk.authenticate(clientId: "test-client-id", clientSecret: "test-client-secret")
         
         // Step 2: Submit authorization transaction
-        let authRequest = try AuthorizationRequest(
+        let authRequest = try CardTransactionRequest(
             paymentProcessorId: "processor-id",
             amount: 100.0,
             currencyId: 1,
             cardDataSource: .manual,
             accountNumber: "4111111111111111",
-            securityCode: "123",
             expirationMonth: 12,
-            expirationYear: 25
+            expirationYear: 25,
+            securityCode: "123"
         )
         
-        let authResponse = AuthorizationResponse(
+        let authResponse = CardTransactionResponse(
             transactionId: "auth-transaction-id",
             transactionDateTime: Date(),
             typeId: 1,
@@ -509,18 +511,18 @@ struct EndToEndIntegrationTests {
         _ = try await sdk.authenticate(clientId: "test-client-id", clientSecret: "test-client-secret")
         
         // Step 2: Submit sale transaction
-        let saleRequest = try AuthorizationRequest(
+        let saleRequest = try CardTransactionRequest(
             paymentProcessorId: "processor-id",
             amount: 100.0,
             currencyId: 1,
             cardDataSource: .manual,
             accountNumber: "4111111111111111",
-            securityCode: "123",
             expirationMonth: 12,
-            expirationYear: 25
+            expirationYear: 25,
+            securityCode: "123"
         )
         
-        let saleResponse = AuthorizationResponse(
+        let saleResponse = CardTransactionResponse(
             transactionId: "sale-transaction-id",
             transactionDateTime: Date(),
             typeId: 2,
@@ -618,9 +620,9 @@ struct EndToEndIntegrationTests {
         // Step 2: Calculate amount
         let calculateRequest = CalculateAmountRequest(
             amount: 100.0,
+            currencyId: 1,
             surchargeRate: 3.0,
-            tipAmount: 10.0,
-            useCardPrice: true
+            tipAmount: 10.0
         )
         
         let calculateResponse = CalculateAmountResponse(
@@ -667,20 +669,19 @@ struct EndToEndIntegrationTests {
         #expect(mockTransactionsService.calculateAmountCallCount == 1)
         
         // Step 3: Submit sale transaction with calculated amount
-        let saleRequest = try AuthorizationRequest(
+        let saleRequest = try CardTransactionRequest(
             paymentProcessorId: "processor-id",
             amount: calculation.creditCard?.totalAmount ?? 113.0,
             currencyId: 1,
             cardDataSource: .manual,
             accountNumber: "4111111111111111",
-            securityCode: "123",
             expirationMonth: 12,
             expirationYear: 25,
-            tipAmount: 10.0,
-            useCardPrice: true
+            securityCode: "123",
+            tipAmount: 10.0
         )
         
-        let saleResponse = AuthorizationResponse(
+        let saleResponse = CardTransactionResponse(
             transactionId: "calculated-transaction-id",
             transactionDateTime: Date(),
             typeId: 2,
@@ -751,8 +752,9 @@ struct EndToEndIntegrationTests {
         let filters = try TransactionFilters(
             page: 0,
             pageSize: 10,
-            asc: true,
-            orderBy: "date"
+            orderBy: "date",
+            asc: true
+            
         )
         
         let transactions2 = TransactionsResponse(
@@ -822,18 +824,18 @@ struct EndToEndIntegrationTests {
         _ = try await sdk.authenticate(clientId: "test-client-id", clientSecret: "test-client-secret")
         
         // Attempt sale transaction that gets declined
-        let saleRequest = try AuthorizationRequest(
+        let saleRequest = try CardTransactionRequest(
             paymentProcessorId: "processor-id",
             amount: 100.0,
             currencyId: 1,
             cardDataSource: .manual,
             accountNumber: "4111111111111111",
-            securityCode: "123",
             expirationMonth: 12,
-            expirationYear: 25
+            expirationYear: 25,
+            securityCode: "123"
         )
         
-        let declinedResponse = AuthorizationResponse(
+        let declinedResponse = CardTransactionResponse(
             transactionId: "declined-transaction-id",
             transactionDateTime: Date(),
             typeId: 2,
@@ -1400,20 +1402,21 @@ struct EndToEndIntegrationTests {
         )
         
         // Concurrent refresh attempts should be handled gracefully
-        try await withThrowingTaskGroup(of: AuthenticationResult.self) { group in
+        try await withThrowingTaskGroup(of: Bool.self) { group in
             for _ in 0..<3 {
                 group.addTask {
                     try await sdk.refreshAccessToken()
                 }
             }
-            
-            var results: [AuthenticationResult] = []
+
+            var results: [Bool] = []
             for try await result in group {
                 results.append(result)
             }
-            
+
             // All should succeed (implementation should handle race conditions)
             #expect(results.count == 3)
+            #expect(results.allSatisfy { $0 == true })
         }
     }
     

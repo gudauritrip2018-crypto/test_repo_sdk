@@ -1,5 +1,5 @@
 import Foundation
-@testable import AriseMobile
+@testable import ARISE
 
 /// Mock implementation of AriseAuthApi for testing authentication flows
 final class MockAriseAuthApi: @unchecked Sendable, AriseAuthApiProtocol {

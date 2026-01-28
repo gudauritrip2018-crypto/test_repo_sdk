@@ -1,6 +1,6 @@
 import Foundation
 import Testing
-@testable import AriseMobile
+@testable import ARISE
 
 /// Tests for Environment to EnvironmentSettings mapping
 struct EnvironmentMappingTests {

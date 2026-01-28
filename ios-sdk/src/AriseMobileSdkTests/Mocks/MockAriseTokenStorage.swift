@@ -1,5 +1,5 @@
 import Foundation
-@testable import AriseMobile
+@testable import ARISE
 
 /// Mock implementation of AriseTokenStorageProtocol for testing
 final class MockAriseTokenStorage: AriseTokenStorageProtocol {

@@ -18,7 +18,12 @@ class TTPService: TTPServiceProtocol, @unchecked Sendable {
     private var _eventObservationTask: Task<Void, Never>?
 
     public var countryCode: String?
-    
+
+    #if DEBUG
+    /// For testing purposes only - allows skipping compatibility check in unit tests
+    internal var skipCompatibilityCheckForTesting = false
+    #endif
+
     init(devicesService: DevicesServiceProtocol, settingsService: SettingsServiceProtocol, transactionsService: TransactionsServiceProtocol, environmentSettings: EnvironmentSettings, cloudCommerceSDK: CloudCommerceSDKProtocol?, tokenStorage: AriseTokenStorageProtocol) {
         self._devicesService = devicesService
         self._settingsService = settingsService
@@ -37,14 +42,7 @@ class TTPService: TTPServiceProtocol, @unchecked Sendable {
         let iosVersionCheck = checkIOSVersion()
         let locationPermission = checkLocationPermission()
         let tapToPayEntitlement = checkTapToPayEntitlement()
-        
-        // If permission is undetermined, request it now
-        if locationPermission == .undetermined {
-            Task { @MainActor in
-                self.locationManager.requestWhenInUseAuthorization()
-            }
-        }
-        
+
         var incompatibilityReasons: [String] = []
         if !deviceModelCheck.isCompatible {
             incompatibilityReasons.append("Device model is not compatible. Required: iPhone XS or newer. Current: \(deviceModelCheck.modelIdentifier)")
@@ -52,8 +50,8 @@ class TTPService: TTPServiceProtocol, @unchecked Sendable {
         if !iosVersionCheck.isCompatible {
             incompatibilityReasons.append("iOS version is not compatible. Required: iOS \(iosVersionCheck.minimumRequiredVersion) or newer. Current: iOS \(iosVersionCheck.version)")
         }
-        if locationPermission == .denied {
-            incompatibilityReasons.append("Location permission is denied or restricted. Current status: \(locationPermission.rawValue)")
+        if locationPermission != .granted {
+            incompatibilityReasons.append("Location permission is required but not granted. Current status: \(locationPermission.rawValue). Please request 'When In Use' location permission (requestWhenInUseAuthorization) in your app before calling TTP methods.")
         }
         if tapToPayEntitlement != .available {
             incompatibilityReasons.append("Tap to Pay entitlement is not available")
@@ -203,7 +201,22 @@ class TTPService: TTPServiceProtocol, @unchecked Sendable {
     /// - Throws: `AriseApiError` if API calls fail (network errors, authentication errors, etc.)
     func activate() async throws {
         _logger.info("Starting TTP activation...")
-        
+
+        // Check device compatibility first
+        #if DEBUG
+        let shouldCheckCompatibility = !skipCompatibilityCheckForTesting
+        #else
+        let shouldCheckCompatibility = true
+        #endif
+
+        if shouldCheckCompatibility {
+            let compatibility = checkCompatibility()
+            if !compatibility.isCompatible {
+                _logger.error("Device is not compatible with Tap to Pay: \(compatibility.incompatibilityReasons.joined(separator: "; "))")
+                throw TTPError.notCompatible(compatibility.incompatibilityReasons)
+            }
+        }
+
         // Check current status for idempotency
         let currentStatus = try await getStatus()
         if currentStatus == .active {
@@ -283,12 +296,29 @@ class TTPService: TTPServiceProtocol, @unchecked Sendable {
     /// - Returns: `TTPPrepareResult` containing upgrade requirements and session expiration info.
     /// - Throws: `TTPError` if TTP status is not active or configuration fails
     func prepare() async throws {
+        _logger.info("Starting TTP prepare...")
+
+        // Check device compatibility first
+        #if DEBUG
+        let shouldCheckCompatibility = !skipCompatibilityCheckForTesting
+        #else
+        let shouldCheckCompatibility = true
+        #endif
+
+        if shouldCheckCompatibility {
+            let compatibility = checkCompatibility()
+            if !compatibility.isCompatible {
+                _logger.error("Device is not compatible with Tap to Pay: \(compatibility.incompatibilityReasons.joined(separator: "; "))")
+                throw TTPError.notCompatible(compatibility.incompatibilityReasons)
+            }
+        }
+
         // Check TTP status is active
         let status = try await getStatus()
         guard status == .active else {
             throw TTPError.notActive("Tap To Pay is not activated. Current status: \(status.rawValue)")
         }
-        
+
         guard let sdk = _cloudCommerceSDK else {
             throw TTPError.sdkNotInitialized
         }

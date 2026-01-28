@@ -1,0 +1,91 @@
+name: Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, ready_for_review, reopened]
+
+jobs:
+  review:
+    name: "Claude Code"
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      id-token: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 1
+
+      - name: Claude
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.CODE_REVIEW_ANTHROPIC_API_KEY }}
+
+          prompt: |
+            REPO: ${{ github.repository }}
+            PR NUMBER: ${{ github.event.pull_request.number }}
+
+            Perform a comprehensive code review with the following focus areas:
+
+            1. **Code Quality**
+               - Clean code principles and best practices
+               - Proper error handling and edge cases
+               - Code readability and maintainability
+
+            2. **Security**
+               - Check for potential security vulnerabilities
+               - Validate input sanitization
+               - Review authentication/authorization logic
+
+            3. **Performance**
+               - Identify potential performance bottlenecks
+               - Review database queries for efficiency
+               - Check for memory leaks or resource issues
+
+            4. **Testing**
+               - Verify adequate test coverage
+               - Review test quality and edge cases
+               - Check for missing test scenarios
+
+            5. **Documentation**
+               - Ensure code is properly documented
+               - Verify README updates for new features
+               - Check API documentation accuracy
+
+            Report ONLY critical or high-severity problems.
+
+            Write the results of your review to a file named `claude-code-review.txt`
+            formatted as GitHub Action annotation messages.
+
+            Each annotation may have the following properties:
+            - severity: one of "notice", "warning" or "error". Required.
+            - message: content of feedback, required. Add hard line breaks with urlencoded newline "%0A" after 120 characters.
+            - title: short title
+            - file: file name
+            - line: line number starting at 1
+            - endLine: end line number starting at 1
+            - col: column number starting at 1
+            - endColumn: end column number starting at 1
+
+            Format those properties into a text string:
+            ```
+            ::{severity} file={name},line={line},endLine={endLine},col={col},endColumn={endColumn},title={title}::{message}
+            ```
+
+            Then write the annotations to the `claude-code-review.txt` file, one per line.
+
+            Example of claude-code-review.txt file:
+            ```
+            ::warning file=example.sql,line=1,title=SQL Injection vulnerability::This SQL statement is unsafe because... use query parameters instead.
+            ::error file=otherfile.js,line=123,title=Logic Bug::This algorithm will get stuck in an infinite loop
+            ```
+
+          show_full_output: ${{ runner.debug == 1 }}
+          claude_args: |
+            --allowedTools "Bash(gh pr diff:*),Bash(gh pr view:*),Edit(./claude-code-review.txt)"
+
+      - name: Review
+        # write the review feedback to STDOUT, and GitHub will display it inline in the PR
+        run: cat claude-code-review.txt

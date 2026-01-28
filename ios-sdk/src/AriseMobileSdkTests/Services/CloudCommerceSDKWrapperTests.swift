@@ -1,7 +1,7 @@
 import Foundation
 import Testing
 import CloudCommerce
-@testable import AriseMobile
+@testable import ARISE
 
 /// Tests for CloudCommerceSDKWrapper
 struct CloudCommerceSDKWrapperTests {

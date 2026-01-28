@@ -1,5 +1,5 @@
 import Foundation
-@testable import AriseMobile
+@testable import ARISE
 
 /// Mock implementation of AriseSessionProtocol for testing
 final class MockAriseSession: AriseSessionProtocol {

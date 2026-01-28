@@ -1,6 +1,6 @@
 import Foundation
 import Testing
-@testable import AriseMobile
+@testable import ARISE
 
 /// Tests for CloudCommerceTransactionWrapper (tested indirectly through TTPTransactionMapper)
 /// Note: CloudCommerceTransactionWrapper is a private struct, so we test it through TTPTransactionMapper

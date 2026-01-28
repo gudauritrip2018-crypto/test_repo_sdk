@@ -5,7 +5,7 @@ struct AuthorizationTransactionMapper {
     /// Map SDK's payment transaction request to OpenAPI generated authorization input
     /// - Parameter input: SDK's payment transaction input
     /// - Returns: Generated API request format
-    static func toGeneratedInput(_ input: AuthorizationRequest) -> Components.Schemas.AuthorizationRequestDto {
+    static func toGeneratedInput(_ input: CardTransactionRequest) -> Components.Schemas.AuthorizationRequestDto {
         let request = Components.Schemas.AuthorizationRequestDto(
             paymentProcessorId: input.paymentProcessorId,
             customerId: input.customerId,
@@ -16,7 +16,7 @@ struct AuthorizationTransactionMapper {
             currencyId: input.currencyId,
             percentageOffRate: input.percentageOffRate,
             surchargeRate: input.surchargeRate,
-            useCardPrice: input.useCardPrice,
+            useCardPrice: true,
             billingAddress: AddressDtoMapper.toGeneratedInput(input.billingAddress),
             shippingAddress: AddressDtoMapper.toGeneratedInput(input.shippingAddress),
             contactInfo: ContactInfoDtoMapper.toGeneratedInput(input.contactInfo),
@@ -46,14 +46,14 @@ struct AuthorizationTransactionMapper {
     /// - Parameter generated: Generated API response from OpenAPI client
     /// - Returns: Authorization transaction result in SDK format
     /// - Throws: Error if response is not successful
-    static func toModel(_ generated: Operations.PostPayApiV1TransactionsAuth.Output) throws -> AuthorizationResponse {
+    static func toModel(_ generated: Operations.PostPayApiV1TransactionsAuth.Output) throws -> CardTransactionResponse {
         let okResponse = try generated.ok
         let responseBody = try okResponse.body.json
         return toModel(responseBody)
     }
     
-    static func toModel(_ response: Components.Schemas.AuthorizationResponseDto) -> AuthorizationResponse {
-        return AuthorizationResponse(
+    static func toModel(_ response: Components.Schemas.AuthorizationResponseDto) -> CardTransactionResponse {
+        return CardTransactionResponse(
             transactionId: response.transactionId,
             transactionDateTime: response.transactionDateTime,
             typeId: response.typeId,

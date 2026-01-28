@@ -1,5 +1,5 @@
 import Foundation
-@testable import AriseMobile
+@testable import ARISE
 
 /// Mock implementation of TokenServiceProtocol for testing
 final class MockTokenService: TokenServiceProtocol, @unchecked Sendable {

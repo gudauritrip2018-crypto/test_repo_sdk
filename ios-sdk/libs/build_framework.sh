@@ -1,9 +1,13 @@
 #!/bin/bash
 
 # --- Configuration ---
-FRAMEWORK_NAME="AriseMobileSdk"
-TARGET_NAME="${FRAMEWORK_NAME}"
-SCHEME_NAME="${FRAMEWORK_NAME}"
+PROJECT_NAME="AriseMobileSdk"
+# Target and output framework name (renamed from AriseMobile to ARISE)
+TARGET_NAME="ARISE"
+SCHEME_NAME="${PROJECT_NAME}"
+# Output names
+FRAMEWORK_OUTPUT_NAME="ARISE"
+XCFRAMEWORK_OUTPUT_NAME="ARISE"
 
 # --- Colors for output ---
 RED='\033[0;31m'
@@ -68,12 +72,12 @@ ask_yes_no() {
 }
 
 # --- Main script ---
-print_status "🚀 Building ${FRAMEWORK_NAME} framework..."
+print_status "🚀 Building ${XCFRAMEWORK_OUTPUT_NAME} framework..."
 
 # Determine script location and set paths
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
-PROJECT_PATH="${PROJECT_ROOT}/src/${FRAMEWORK_NAME}.xcodeproj"
+PROJECT_PATH="${PROJECT_ROOT}/src/${PROJECT_NAME}.xcodeproj"
 OUTPUT_DIR="${SCRIPT_DIR}"
 
 # Check if running from the correct directory structure
@@ -87,7 +91,7 @@ mkdir -p ${OUTPUT_DIR}
 
 # Remove old XCFramework
 print_status "Removing old XCFramework..."
-rm -rf ${OUTPUT_DIR}/AriseMobileSdk.xcframework
+rm -rf ${OUTPUT_DIR}/ARISE.xcframework
 
 # Build for device
 print_status "📱 Building for device (arm64)..."
@@ -139,10 +143,10 @@ print_status "Using DerivedData path: $DERIVED_DATA_PATH"
 print_status "📦 Creating XCFramework using xcodebuild -create-xcframework..."
 
 # Extract frameworks and dSYMs from DerivedData
-DEVICE_FRAMEWORK="$DERIVED_DATA_PATH/Build/Products/Debug-iphoneos/AriseMobileSdk.framework"
-DEVICE_DSYM="$DERIVED_DATA_PATH/Build/Products/Debug-iphoneos/AriseMobileSdk.framework.dSYM"
-SIMULATOR_FRAMEWORK="$DERIVED_DATA_PATH/Build/Products/Debug-iphonesimulator/AriseMobileSdk.framework"
-SIMULATOR_DSYM="$DERIVED_DATA_PATH/Build/Products/Debug-iphonesimulator/AriseMobileSdk.framework.dSYM"
+DEVICE_FRAMEWORK="$DERIVED_DATA_PATH/Build/Products/Debug-iphoneos/ARISE.framework"
+DEVICE_DSYM="$DERIVED_DATA_PATH/Build/Products/Debug-iphoneos/ARISE.framework.dSYM"
+SIMULATOR_FRAMEWORK="$DERIVED_DATA_PATH/Build/Products/Debug-iphonesimulator/ARISE.framework"
+SIMULATOR_DSYM="$DERIVED_DATA_PATH/Build/Products/Debug-iphonesimulator/ARISE.framework.dSYM"
 
 if [ -d "$DEVICE_FRAMEWORK" ]; then
     print_success "Device framework found at: $DEVICE_FRAMEWORK"
@@ -152,27 +156,27 @@ if [ -d "$DEVICE_FRAMEWORK" ]; then
         print_status "Creating universal XCFramework manually..."
         
         # Create XCFramework structure manually
-        mkdir -p ${OUTPUT_DIR}/AriseMobileSdk.xcframework/ios-arm64/AriseMobileSdk.framework
-        mkdir -p ${OUTPUT_DIR}/AriseMobileSdk.xcframework/ios-arm64-simulator/AriseMobileSdk.framework
+        mkdir -p ${OUTPUT_DIR}/ARISE.xcframework/ios-arm64/ARISE.framework
+        mkdir -p ${OUTPUT_DIR}/ARISE.xcframework/ios-arm64-simulator/ARISE.framework
         
         # Copy device framework
-        cp -R "$DEVICE_FRAMEWORK"/* ${OUTPUT_DIR}/AriseMobileSdk.xcframework/ios-arm64/AriseMobileSdk.framework/
+        cp -R "$DEVICE_FRAMEWORK"/* ${OUTPUT_DIR}/ARISE.xcframework/ios-arm64/ARISE.framework/
         print_success "Device framework copied successfully"
         
         # Remove any nested frameworks (CloudCommerce should not be embedded)
-        if [ -d "${OUTPUT_DIR}/AriseMobileSdk.xcframework/ios-arm64/AriseMobileSdk.framework/Frameworks" ]; then
+        if [ -d "${OUTPUT_DIR}/ARISE.xcframework/ios-arm64/ARISE.framework/Frameworks" ]; then
             print_status "Removing nested Frameworks directory from device framework..."
-            rm -rf "${OUTPUT_DIR}/AriseMobileSdk.xcframework/ios-arm64/AriseMobileSdk.framework/Frameworks"
+            rm -rf "${OUTPUT_DIR}/ARISE.xcframework/ios-arm64/ARISE.framework/Frameworks"
         fi
         
         # Copy simulator framework
-        cp -R "$SIMULATOR_FRAMEWORK"/* ${OUTPUT_DIR}/AriseMobileSdk.xcframework/ios-arm64-simulator/AriseMobileSdk.framework/
+        cp -R "$SIMULATOR_FRAMEWORK"/* ${OUTPUT_DIR}/ARISE.xcframework/ios-arm64-simulator/ARISE.framework/
         print_success "Simulator framework copied successfully"
         
         # Remove any nested frameworks (CloudCommerce should not be embedded)
-        if [ -d "${OUTPUT_DIR}/AriseMobileSdk.xcframework/ios-arm64-simulator/AriseMobileSdk.framework/Frameworks" ]; then
+        if [ -d "${OUTPUT_DIR}/ARISE.xcframework/ios-arm64-simulator/ARISE.framework/Frameworks" ]; then
             print_status "Removing nested Frameworks directory from simulator framework..."
-            rm -rf "${OUTPUT_DIR}/AriseMobileSdk.xcframework/ios-arm64-simulator/AriseMobileSdk.framework/Frameworks"
+            rm -rf "${OUTPUT_DIR}/ARISE.xcframework/ios-arm64-simulator/ARISE.framework/Frameworks"
         fi
         
         # Ask user if they want to include dSYM files
@@ -181,7 +185,7 @@ if [ -d "$DEVICE_FRAMEWORK" ]; then
         if ask_yes_no "Include dSYM files?" "y"; then
             # Copy device dSYM if it exists
             if [ -d "$DEVICE_DSYM" ]; then
-                cp -R "$DEVICE_DSYM" ${OUTPUT_DIR}/AriseMobileSdk.xcframework/ios-arm64/
+                cp -R "$DEVICE_DSYM" ${OUTPUT_DIR}/ARISE.xcframework/ios-arm64/
                 print_success "Device dSYM copied successfully"
             else
                 print_status "⚠️  Device dSYM not found (this is expected if DEBUG_INFORMATION_FORMAT is not set to dwarf-with-dsym)"
@@ -189,7 +193,7 @@ if [ -d "$DEVICE_FRAMEWORK" ]; then
             
             # Copy simulator dSYM if it exists
             if [ -d "$SIMULATOR_DSYM" ]; then
-                cp -R "$SIMULATOR_DSYM" ${OUTPUT_DIR}/AriseMobileSdk.xcframework/ios-arm64-simulator/
+                cp -R "$SIMULATOR_DSYM" ${OUTPUT_DIR}/ARISE.xcframework/ios-arm64-simulator/
                 print_success "Simulator dSYM copied successfully"
             else
                 print_status "⚠️  Simulator dSYM not found (this is expected if DEBUG_INFORMATION_FORMAT is not set to dwarf-with-dsym)"
@@ -199,7 +203,7 @@ if [ -d "$DEVICE_FRAMEWORK" ]; then
         fi
         
         # Create Info.plist
-        cat > ${OUTPUT_DIR}/AriseMobileSdk.xcframework/Info.plist << 'EOF'
+        cat > ${OUTPUT_DIR}/ARISE.xcframework/Info.plist << 'EOF'
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -210,7 +214,7 @@ if [ -d "$DEVICE_FRAMEWORK" ]; then
             <key>LibraryIdentifier</key>
             <string>ios-arm64</string>
             <key>LibraryPath</key>
-            <string>AriseMobileSdk.framework</string>
+            <string>ARISE.framework</string>
             <key>SupportedArchitectures</key>
             <array>
                 <string>arm64</string>
@@ -222,7 +226,7 @@ if [ -d "$DEVICE_FRAMEWORK" ]; then
             <key>LibraryIdentifier</key>
             <string>ios-arm64-simulator</string>
             <key>LibraryPath</key>
-            <string>AriseMobileSdk.framework</string>
+            <string>ARISE.framework</string>
             <key>SupportedArchitectures</key>
             <array>
                 <string>arm64</string>
@@ -246,16 +250,16 @@ EOF
         print_warning "Simulator framework not found, creating device-only XCFramework..."
         
         # Create XCFramework structure manually
-        mkdir -p ${OUTPUT_DIR}/AriseMobileSdk.xcframework/ios-arm64/AriseMobileSdk.framework
+        mkdir -p ${OUTPUT_DIR}/ARISE.xcframework/ios-arm64/ARISE.framework
         
         # Copy device framework
-        cp -R "$DEVICE_FRAMEWORK"/* ${OUTPUT_DIR}/AriseMobileSdk.xcframework/ios-arm64/AriseMobileSdk.framework/
+        cp -R "$DEVICE_FRAMEWORK"/* ${OUTPUT_DIR}/ARISE.xcframework/ios-arm64/ARISE.framework/
         print_success "Device framework copied successfully"
         
         # Remove any nested frameworks (CloudCommerce should not be embedded)
-        if [ -d "${OUTPUT_DIR}/AriseMobileSdk.xcframework/ios-arm64/AriseMobileSdk.framework/Frameworks" ]; then
+        if [ -d "${OUTPUT_DIR}/ARISE.xcframework/ios-arm64/ARISE.framework/Frameworks" ]; then
             print_status "Removing nested Frameworks directory from device framework..."
-            rm -rf "${OUTPUT_DIR}/AriseMobileSdk.xcframework/ios-arm64/AriseMobileSdk.framework/Frameworks"
+            rm -rf "${OUTPUT_DIR}/ARISE.xcframework/ios-arm64/ARISE.framework/Frameworks"
         fi
         
         # Ask user if they want to include dSYM files
@@ -264,7 +268,7 @@ EOF
         if ask_yes_no "Include dSYM files?" "y"; then
             # Copy device dSYM if it exists
             if [ -d "$DEVICE_DSYM" ]; then
-                cp -R "$DEVICE_DSYM" ${OUTPUT_DIR}/AriseMobileSdk.xcframework/ios-arm64/
+                cp -R "$DEVICE_DSYM" ${OUTPUT_DIR}/ARISE.xcframework/ios-arm64/
                 print_success "Device dSYM copied successfully"
             else
                 print_status "⚠️  Device dSYM not found (this is expected if DEBUG_INFORMATION_FORMAT is not set to dwarf-with-dsym)"
@@ -274,7 +278,7 @@ EOF
         fi
         
         # Create Info.plist
-        cat > ${OUTPUT_DIR}/AriseMobileSdk.xcframework/Info.plist << 'EOF'
+        cat > ${OUTPUT_DIR}/ARISE.xcframework/Info.plist << 'EOF'
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -285,7 +289,7 @@ EOF
             <key>LibraryIdentifier</key>
             <string>ios-arm64</string>
             <key>LibraryPath</key>
-            <string>AriseMobileSdk.framework</string>
+            <string>ARISE.framework</string>
             <key>SupportedArchitectures</key>
             <array>
                 <string>arm64</string>
@@ -312,36 +316,36 @@ fi
 
 # Verify the framework
 print_status "✅ Verifying framework..."
-if [ -d "${OUTPUT_DIR}/AriseMobileSdk.xcframework" ]; then
+if [ -d "${OUTPUT_DIR}/ARISE.xcframework" ]; then
     print_success "XCFramework created successfully!"
-    print_status "Framework location: ${OUTPUT_DIR}/AriseMobileSdk.xcframework"
+    print_status "Framework location: ${OUTPUT_DIR}/ARISE.xcframework"
     
     # Show framework contents
     print_status "📋 Framework contents:"
-    ls -la ${OUTPUT_DIR}/AriseMobileSdk.xcframework/
+    ls -la ${OUTPUT_DIR}/ARISE.xcframework/
     
     # Verify no nested frameworks
     print_status "🔍 Checking for nested frameworks..."
-    if find ${OUTPUT_DIR}/AriseMobileSdk.xcframework -type d -name "Frameworks" | grep -q .; then
+    if find ${OUTPUT_DIR}/ARISE.xcframework -type d -name "Frameworks" | grep -q .; then
         print_error "⚠️  WARNING: Found nested Frameworks directory! This should not be present."
-        find ${OUTPUT_DIR}/AriseMobileSdk.xcframework -type d -name "Frameworks"
+        find ${OUTPUT_DIR}/ARISE.xcframework -type d -name "Frameworks"
     else
         print_success "✅ No nested Frameworks found (correct)"
     fi
     
     # Verify dSYM files
     print_status "🔍 Checking for dSYM files..."
-    DSYM_COUNT=$(find ${OUTPUT_DIR}/AriseMobileSdk.xcframework -name "*.dSYM" -type d | wc -l | tr -d ' ')
+    DSYM_COUNT=$(find ${OUTPUT_DIR}/ARISE.xcframework -name "*.dSYM" -type d | wc -l | tr -d ' ')
     if [ "$DSYM_COUNT" -gt 0 ]; then
         print_success "✅ Found $DSYM_COUNT dSYM file(s)"
-        find ${OUTPUT_DIR}/AriseMobileSdk.xcframework -name "*.dSYM" -type d
+        find ${OUTPUT_DIR}/ARISE.xcframework -name "*.dSYM" -type d
     else
         print_status "⚠️  No dSYM files found in XCFramework"
     fi
     
     # Show architectures for each platform
     print_status "🏗️ Supported architectures:"
-    find ${OUTPUT_DIR}/AriseMobileSdk.xcframework -name "*.framework" -exec echo "Framework: {}" \; -exec lipo -info {}/AriseMobileSdk \;
+    find ${OUTPUT_DIR}/ARISE.xcframework -name "*.framework" -exec echo "Framework: {}" \; -exec lipo -info {}/ARISE \;
     
     print_status "📊 Framework summary:"
     print_status "   - Device (iOS): arm64"
@@ -358,4 +362,4 @@ print_status "Universal framework supports:"
 print_status "  • iOS devices (arm64)"
 print_status "  • iOS Simulator on Apple Silicon (arm64)"
 print_status "  • Combined device and simulator builds into single XCFramework"
-print_status "📍 Location: ${OUTPUT_DIR}/AriseMobileSdk.xcframework"
+print_status "📍 Location: ${OUTPUT_DIR}/ARISE.xcframework"

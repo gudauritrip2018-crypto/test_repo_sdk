@@ -56,7 +56,6 @@ internal struct PaymentSettingsResponseMapper {
             availableTransactionTypes: transactionTypes,
             availablePaymentProcessors: processors,
             avs: avsOptions,
-            isCustomerCardSavingByTerminalEnabled: responseBody.isCustomerCardSavingByTerminalEnabled ?? false,
             companyName: responseBody.companyName,
             mccCode: responseBody.mccCode,
             currencyCode: responseBody.currencyIsoCode,

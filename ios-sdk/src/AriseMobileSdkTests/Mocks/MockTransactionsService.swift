@@ -1,5 +1,5 @@
 import Foundation
-@testable import AriseMobile
+@testable import ARISE
 
 /// Mock implementation of TransactionsServiceProtocol for testing
 final class MockTransactionsService: TransactionsServiceProtocol, @unchecked Sendable {
@@ -37,8 +37,8 @@ final class MockTransactionsService: TransactionsServiceProtocol, @unchecked Sen
         }
     }
     
-    private var _submitAuthTransactionResult: Result<AuthorizationResponse, Error> = .success(
-        AuthorizationResponse(
+    private var _submitAuthTransactionResult: Result<CardTransactionResponse, Error> = .success(
+        CardTransactionResponse(
             transactionId: "mock-transaction-id",
             transactionDateTime: Date(),
             typeId: 1,
@@ -51,8 +51,8 @@ final class MockTransactionsService: TransactionsServiceProtocol, @unchecked Sen
             avsResponse: nil
         )
     )
-    private var _submitSaleTransactionResult: Result<AuthorizationResponse, Error> = .success(
-        AuthorizationResponse(
+    private var _submitSaleTransactionResult: Result<CardTransactionResponse, Error> = .success(
+        CardTransactionResponse(
             transactionId: "mock-sale-transaction-id",
             transactionDateTime: Date(),
             typeId: 2,
@@ -116,7 +116,7 @@ final class MockTransactionsService: TransactionsServiceProtocol, @unchecked Sen
     )
     
     // Thread-safe accessors for result properties
-    var submitAuthTransactionResult: Result<AuthorizationResponse, Error> {
+    var submitAuthTransactionResult: Result<CardTransactionResponse, Error> {
         get {
             lock.lock()
             defer { lock.unlock() }
@@ -129,7 +129,7 @@ final class MockTransactionsService: TransactionsServiceProtocol, @unchecked Sen
         }
     }
     
-    var submitSaleTransactionResult: Result<AuthorizationResponse, Error> {
+    var submitSaleTransactionResult: Result<CardTransactionResponse, Error> {
         get {
             lock.lock()
             defer { lock.unlock() }
@@ -207,8 +207,8 @@ final class MockTransactionsService: TransactionsServiceProtocol, @unchecked Sen
     
     private var _lastGetTransactionsFilters: TransactionFilters?
     private var _lastGetTransactionDetailsId: String?
-    private var _lastSubmitAuthTransactionRequest: AuthorizationRequest?
-    private var _lastSubmitSaleTransactionRequest: AuthorizationRequest?
+    private var _lastSubmitAuthTransactionRequest: CardTransactionRequest?
+    private var _lastSubmitSaleTransactionRequest: CardTransactionRequest?
     private var _lastCalculateAmountRequest: CalculateAmountRequest?
     private var _lastVoidTransactionId: String?
     private var _lastCaptureTransactionId: String?
@@ -268,12 +268,12 @@ final class MockTransactionsService: TransactionsServiceProtocol, @unchecked Sen
         defer { lock.unlock() }
         return _lastGetTransactionDetailsId
     }
-    var lastSubmitAuthTransactionRequest: AuthorizationRequest? {
+    var lastSubmitAuthTransactionRequest: CardTransactionRequest? {
         lock.lock()
         defer { lock.unlock() }
         return _lastSubmitAuthTransactionRequest
     }
-    var lastSubmitSaleTransactionRequest: AuthorizationRequest? {
+    var lastSubmitSaleTransactionRequest: CardTransactionRequest? {
         lock.lock()
         defer { lock.unlock() }
         return _lastSubmitSaleTransactionRequest
@@ -345,8 +345,8 @@ final class MockTransactionsService: TransactionsServiceProtocol, @unchecked Sen
         }
     }
     
-    func submitAuthTransaction(request: AuthorizationRequest) async throws -> AuthorizationResponse {
-        let result: Result<AuthorizationResponse, Error>
+    func submitAuthTransaction(request: CardTransactionRequest) async throws -> CardTransactionResponse {
+        let result: Result<CardTransactionResponse, Error>
         lock.lock()
         defer { lock.unlock() }
         
@@ -362,8 +362,8 @@ final class MockTransactionsService: TransactionsServiceProtocol, @unchecked Sen
         }
     }
     
-    func submitSaleTransaction(request: AuthorizationRequest) async throws -> AuthorizationResponse {
-        let result: Result<AuthorizationResponse, Error>
+    func submitSaleTransaction(request: CardTransactionRequest) async throws -> CardTransactionResponse {
+        let result: Result<CardTransactionResponse, Error>
         lock.lock()
         defer { lock.unlock() }
         

@@ -16,8 +16,8 @@ struct TransactionFiltersMapper {
         }
         
         // Map sorting parameters
-        query.asc = filters.asc
         query.orderBy = filters.orderBy
+        query.asc = filters.asc
         
         // Map filter parameters
         if let createMethodId = filters.createMethodId {

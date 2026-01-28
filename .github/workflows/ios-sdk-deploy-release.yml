@@ -3,11 +3,6 @@ name: Deploy iOS SDK Release
 on:
   workflow_dispatch:
     inputs:
-      dry_run:
-        description: 'Dry run mode (skip commit, push and release creation)'
-        required: false
-        type: boolean
-        default: true
       release_notes_file:
         description: 'Path to release notes file (leave empty to auto-generate from commits)'
         required: false
@@ -27,20 +22,8 @@ jobs:
       version: ${{ steps.version.outputs.version }}
       tag: ${{ steps.version.outputs.tag }}
       changelog: ${{ steps.changelog.outputs.changelog }}
-      dry_run: ${{ steps.check-mode.outputs.dry_run }}
 
     steps:
-      - name: Check run mode
-        id: check-mode
-        run: |
-          DRY_RUN="${{ github.event.inputs.dry_run || 'true' }}"
-          echo "dry_run=$DRY_RUN" >> $GITHUB_OUTPUT
-          if [ "$DRY_RUN" = "true" ]; then
-            echo "🧪 DRY RUN MODE - Will skip commit, push and release creation"
-          else
-            echo "🚀 PRODUCTION MODE - Will publish to distribution repo"
-          fi
-
       - name: Checkout
         uses: actions/checkout@v4
         with:
@@ -54,20 +37,6 @@ jobs:
           private-key: ${{ secrets.DISTRIBUTION_APP_PRIVATE_KEY }}
           owner: ${{ secrets.DISTRIBUTION_REPO_OWNER }}
           repositories: ${{ secrets.DISTRIBUTION_REPO_NAME }}
-
-      - name: Verify token works
-        env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
-          DIST_REPO: ${{ secrets.DISTRIBUTION_REPO }}
-        run: |
-          echo "Testing token access to $DIST_REPO..."
-
-          # Simple test - try to get repo info
-          if gh repo view "$DIST_REPO" --json name -q '.name' > /dev/null 2>&1; then
-            echo "✅ Token has access to repository"
-          else
-            echo "⚠️ Could not access repository via gh, will try with git..."
-          fi
 
       - name: Extract version from branch name
         id: version
@@ -96,6 +65,7 @@ jobs:
           DIST_REPO_TOKEN: ${{ steps.app-token.outputs.token }}
           DIST_REPO: ${{ secrets.DISTRIBUTION_REPO }}
         run: |
+          REPO_URL="https://x-access-token:${DIST_REPO_TOKEN}@github.com/${DIST_REPO}.git"
           NOTES_FILE="${{ inputs.release_notes_file }}"
 
           # Use file only if path is provided AND file exists AND has content
@@ -112,7 +82,7 @@ jobs:
 
             # Find the last release tag from distribution repo
             LAST_TAG=""
-            if git clone --bare --filter=blob:none "https://x-access-token:${DIST_REPO_TOKEN}@github.com/${DIST_REPO}.git" dist-repo-tags 2>/dev/null; then
+            if git clone --bare --filter=blob:none "$REPO_URL" dist-repo-tags 2>/dev/null; then
               cd dist-repo-tags
               # Get production tags (exclude pre-release), sort by version, get the latest
               LAST_TAG=$(git tag -l "v*" | grep -v "pre-release" | sort -V | tail -1)
@@ -122,9 +92,14 @@ jobs:
 
             if [ -n "$LAST_TAG" ]; then
               echo "Last release tag: $LAST_TAG"
-              # Find the commit date of the last tag in distribution repo
-              # and get commits since that date in this repo
-              LAST_TAG_DATE=$(git clone --bare --filter=blob:none "https://x-access-token:${DIST_REPO_TOKEN}@github.com/${DIST_REPO}.git" dist-repo-date 2>/dev/null && cd dist-repo-date && git log -1 --format="%ci" "$LAST_TAG" 2>/dev/null && cd .. && rm -rf dist-repo-date || echo "")
+              # Clone and get tag date with proper error handling
+              LAST_TAG_DATE=""
+              if git clone --bare --filter=blob:none "$REPO_URL" dist-repo-date 2>/dev/null; then
+                LAST_TAG_DATE=$(cd dist-repo-date && git log -1 --format="%ci" "$LAST_TAG" 2>/dev/null || echo "")
+                rm -rf dist-repo-date
+              else
+                echo "Warning: Failed to clone repo for tag date"
+              fi
 
               if [ -n "$LAST_TAG_DATE" ]; then
                 echo "Last release date: $LAST_TAG_DATE"
@@ -178,7 +153,20 @@ jobs:
 
       - name: Boot Simulator
         run: |
-          SIMULATOR_ID=$(xcrun simctl list devices available | grep "iPhone" | head -1 | sed 's/.*(\([A-F0-9-]*\)).*/\1/')
+          # Extract simulator ID with validation
+          SIMULATOR_LINE=$(xcrun simctl list devices available | grep "iPhone" | head -1)
+          if [ -z "$SIMULATOR_LINE" ]; then
+            echo "Error: No iPhone simulator found"
+            exit 1
+          fi
+
+          SIMULATOR_ID=$(echo "$SIMULATOR_LINE" | grep -oE '[A-F0-9]{8}-[A-F0-9]{4}-[A-F0-9]{4}-[A-F0-9]{4}-[A-F0-9]{12}')
+          if [ -z "$SIMULATOR_ID" ]; then
+            echo "Error: Could not extract simulator ID from: $SIMULATOR_LINE"
+            exit 1
+          fi
+
+          echo "Booting simulator: $SIMULATOR_ID"
           xcrun simctl boot "$SIMULATOR_ID" 2>/dev/null || true
           echo "Simulator ready"
 
@@ -237,8 +225,8 @@ jobs:
         run: |
           mkdir -p ios-sdk/Distribution/libs
 
-          if [ -d "ios-sdk/libs/AriseMobile.xcframework" ]; then
-            cp -R ios-sdk/libs/AriseMobile.xcframework ios-sdk/Distribution/libs/
+          if [ -d "ios-sdk/libs/ARISE.xcframework" ]; then
+            cp -R ios-sdk/libs/ARISE.xcframework ios-sdk/Distribution/libs/
           fi
 
           if [ -d "ios-sdk/libs/CloudCommerce.xcframework" ]; then
@@ -265,19 +253,11 @@ jobs:
 
   release:
     needs: [setup, test, build]
-    if: needs.setup.result == 'success' && needs.build.result == 'success' && (needs.test.result == 'success' || needs.test.result == 'skipped')
+    if: always() && needs.setup.result == 'success' && needs.build.result == 'success' && (needs.test.result == 'success' || needs.test.result == 'skipped')
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
     steps:
-      - name: Check run mode
-        run: |
-          if [ "${{ needs.setup.outputs.dry_run }}" = "true" ]; then
-            echo "🧪 DRY RUN MODE - Will skip commit, push and release creation"
-          else
-            echo "🚀 PRODUCTION MODE - Publishing to distribution repo"
-          fi
-
       - name: Generate GitHub App Token
         id: app-token
         uses: actions/create-github-app-token@v1
@@ -293,14 +273,11 @@ jobs:
           name: ios-sdk-build
           path: distribution-files/
 
-      - name: List Build Artifacts
-        run: |
-          echo "📦 Build artifacts:"
-          ls -lhR distribution-files/
-
       - name: Setup Distribution Repository
+        env:
+          GIT_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
-          REPO_URL="https://x-access-token:${{ steps.app-token.outputs.token }}@github.com/${{ secrets.DISTRIBUTION_REPO }}.git"
+          REPO_URL="https://x-access-token:${GIT_TOKEN}@github.com/${{ secrets.DISTRIBUTION_REPO }}.git"
 
           git clone "$REPO_URL" distribution-repo 2>/dev/null || {
             mkdir distribution-repo
@@ -337,73 +314,69 @@ jobs:
           rm -rf distribution-repo/libs/*
           cp -R distribution-files/libs/* distribution-repo/libs/
 
-          echo "Files copied to distribution-repo:"
-          ls -lhR distribution-repo/
+          echo "Files copied"
 
-      - name: Commit Changes
+      - name: Commit and Push
         working-directory: distribution-repo
         run: |
           git add .
 
           if git diff --staged --quiet; then
-            echo "No changes to commit"
+            echo "No changes"
           else
             VERSION="${{ needs.setup.outputs.version }}"
             git commit -m "Release v${VERSION}"
-            echo "Commit created: Release v${VERSION}"
-            git log -1 --oneline
+
+            # Pull with rebase to handle concurrent pushes, then push with retry
+            MAX_RETRIES=3
+            for i in $(seq 1 $MAX_RETRIES); do
+              git pull --rebase origin release 2>/dev/null || true
+              if git push -u origin release; then
+                echo "Pushed successfully"
+                break
+              fi
+              if [ $i -eq $MAX_RETRIES ]; then
+                echo "Failed to push after $MAX_RETRIES attempts"
+                exit 1
+              fi
+              echo "Push failed, retrying ($i/$MAX_RETRIES)..."
+              sleep 2
+            done
           fi
-
-      - name: Push Changes
-        if: needs.setup.outputs.dry_run != 'true'
-        working-directory: distribution-repo
-        run: |
-          git push -u origin release
-          echo "Pushed to release branch"
-
-      - name: "[DRY RUN] Skip Push"
-        if: needs.setup.outputs.dry_run == 'true'
-        run: |
-          echo "🧪 DRY RUN: Skipping git push"
 
       - name: Create Tag
         working-directory: distribution-repo
         run: |
           TAG="${{ needs.setup.outputs.tag }}"
 
-          if git rev-parse "$TAG" >/dev/null 2>&1; then
-            git tag -d "$TAG"
-          fi
+          # Delete local tag if exists
+          git tag -d "$TAG" 2>/dev/null || true
 
+          # Atomic tag creation: create and push, handle failure gracefully
           git tag -a "$TAG" -m "Release $TAG"
-          echo "Tag created locally: $TAG"
-
-      - name: Push Tag
-        if: needs.setup.outputs.dry_run != 'true'
-        working-directory: distribution-repo
-        run: |
-          TAG="${{ needs.setup.outputs.tag }}"
-          if git ls-remote --tags origin "refs/tags/${TAG}" | grep -q .; then
-            echo "Tag $TAG already exists remotely, skipping"
+          if git push origin "$TAG" 2>&1; then
+            echo "Tag $TAG created"
           else
-            git push origin "$TAG"
-            echo "Tag $TAG pushed"
+            echo "Tag $TAG already exists or push failed, skipping"
+            git tag -d "$TAG" 2>/dev/null || true
           fi
-
-      - name: "[DRY RUN] Skip Push Tag"
-        if: needs.setup.outputs.dry_run == 'true'
-        run: |
-          echo "🧪 DRY RUN: Skipping tag push for ${{ needs.setup.outputs.tag }}"
 
       - name: Find Archive
         id: archive
         run: |
-          ARCHIVE=$(ls distribution-files/*.zip 2>/dev/null | head -1)
+          # Find zip files with validation
+          ARCHIVE=$(find distribution-files -maxdepth 1 -name "*.zip" -type f 2>/dev/null | head -1)
+
+          if [ -z "$ARCHIVE" ] || [ ! -f "$ARCHIVE" ]; then
+            echo "Error: No zip archive found in distribution-files/"
+            ls -la distribution-files/ || true
+            exit 1
+          fi
+
           echo "path=$ARCHIVE" >> $GITHUB_OUTPUT
           echo "Archive: $ARCHIVE"
 
       - name: Create GitHub Release
-        if: needs.setup.outputs.dry_run != 'true'
         uses: softprops/action-gh-release@v1
         with:
           repository: ${{ secrets.DISTRIBUTION_REPO }}
@@ -428,29 +401,12 @@ jobs:
           files: ${{ steps.archive.outputs.path }}
           draft: false
 
-      - name: "[DRY RUN] Skip Create GitHub Release"
-        if: needs.setup.outputs.dry_run == 'true'
-        run: |
-          echo "🧪 DRY RUN: Skipping GitHub Release creation"
-          echo ""
-          echo "Would create release:"
-          echo "  Repository: ${{ secrets.DISTRIBUTION_REPO }}"
-          echo "  Tag: ${{ needs.setup.outputs.tag }}"
-          echo "  Name: AriseMobileSdk ${{ needs.setup.outputs.tag }}"
-          echo "  Prerelease: false"
-          echo "  Archive: ${{ steps.archive.outputs.path }}"
-
       - name: Summary
         run: |
           echo "## Release Complete" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          if [ "${{ needs.setup.outputs.dry_run }}" = "true" ]; then
-            echo "⚠️ **DRY RUN MODE** - Commit, push and release creation were skipped" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-          fi
           echo "| Property | Value |" >> $GITHUB_STEP_SUMMARY
           echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
           echo "| Version | ${{ needs.setup.outputs.version }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Tag | ${{ needs.setup.outputs.tag }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Branch | release |" >> $GITHUB_STEP_SUMMARY
-          echo "| Dry Run | ${{ needs.setup.outputs.dry_run }} |" >> $GITHUB_STEP_SUMMARY

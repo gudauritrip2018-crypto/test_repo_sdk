@@ -1,6 +1,6 @@
 import Foundation
 import Testing
-@testable import AriseMobile
+@testable import ARISE
 
 /// Tests for AriseApiError enum and error handling
 struct AriseApiErrorTests {

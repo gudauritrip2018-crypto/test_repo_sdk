@@ -1,6 +1,6 @@
 import Foundation
 import Testing
-@testable import AriseMobile
+@testable import ARISE
 
 /// Tests for FlexibleISO8601DateTranscoder utility
 struct FlexibleISO8601DateTranscoderTests {

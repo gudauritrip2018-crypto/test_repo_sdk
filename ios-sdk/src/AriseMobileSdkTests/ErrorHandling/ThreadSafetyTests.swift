@@ -1,6 +1,6 @@
 import Foundation
 import Testing
-@testable import AriseMobile
+@testable import ARISE
 
 /// Tests for thread-safety in public API
 struct ThreadSafetyTests {
@@ -83,8 +83,8 @@ struct ThreadSafetyTests {
                     return try? TransactionFilters(
                         page: i,
                         pageSize: 20,
-                        asc: i % 2 == 0,
                         orderBy: "date",
+                        asc: i % 2 == 0,
                         createMethodId: allCases[i % allCases.count],
                         createdById: nil,
                         batchId: nil,

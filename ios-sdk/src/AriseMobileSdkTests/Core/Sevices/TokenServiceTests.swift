@@ -1,6 +1,6 @@
 import Foundation
 import Testing
-@testable import AriseMobile
+@testable import ARISE
 
 /// Tests for TokenService focusing on token generation, validation, expiration handling, and refresh logic
 struct TokenServiceTests {

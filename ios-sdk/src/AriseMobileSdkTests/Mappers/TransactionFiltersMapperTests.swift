@@ -1,6 +1,6 @@
 import Foundation
 import Testing
-@testable import AriseMobile
+@testable import ARISE
 
 /// Tests for TransactionFiltersMapper
 struct TransactionFiltersMapperTests {
@@ -10,8 +10,8 @@ struct TransactionFiltersMapperTests {
         let filters = try TransactionFilters(
             page: 1,
             pageSize: 20,
-            asc: true,
             orderBy: "date",
+            asc: true,
             createMethodId: .portal,
             createdById: "user-123",
             batchId: "batch-456",
@@ -35,20 +35,20 @@ struct TransactionFiltersMapperTests {
         let filters = try TransactionFilters(
             page: nil,
             pageSize: nil,
-            asc: nil,
             orderBy: nil,
+            asc: nil,
             createMethodId: nil,
             createdById: nil,
             batchId: nil,
             noBatch: nil
         )
-        
+
         let result = TransactionFiltersMapper.toGeneratedInput(filters)
-        
+
         #expect(result.query.page == nil)
         #expect(result.query.pageSize == nil)
-        #expect(result.query.asc == nil)
         #expect(result.query.orderBy == nil)
+        #expect(result.query.asc == nil)
         #expect(result.query.createMethodId == nil)
         #expect(result.query.createdById == nil)
         #expect(result.query.batchId == nil)
@@ -68,8 +68,8 @@ struct TransactionFiltersMapperTests {
         let filters = try TransactionFilters(
             page: 5,
             pageSize: 50,
-            asc: nil,
             orderBy: nil,
+            asc: nil,
             createMethodId: nil,
             createdById: nil,
             batchId: nil,
@@ -87,8 +87,8 @@ struct TransactionFiltersMapperTests {
         let filters = try TransactionFilters(
             page: nil,
             pageSize: nil,
-            asc: nil,
             orderBy: nil,
+            asc: nil,
             createMethodId: .tapToPay,
             createdById: nil,
             batchId: nil,

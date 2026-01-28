@@ -1,6 +1,6 @@
 import Foundation
 import Testing
-@testable import AriseMobile
+@testable import ARISE
 
 /// Comprehensive tests for error handling and edge cases
 struct ErrorHandlingAndEdgeCasesTests {
@@ -87,8 +87,8 @@ struct ErrorHandlingAndEdgeCasesTests {
         let filters = try TransactionFilters(
             page: nil,
             pageSize: nil,
-            asc: nil,
             orderBy: nil,
+            asc: nil,
             createMethodId: nil,
             createdById: nil,
             batchId: nil,
@@ -107,8 +107,8 @@ struct ErrorHandlingAndEdgeCasesTests {
         let filters = try TransactionFilters(
             page: 1,
             pageSize: 20,
-            asc: true,
             orderBy: "", // Empty string
+            asc: true,
             createMethodId: nil,
             createdById: "", // Empty string
             batchId: "", // Empty string
@@ -134,14 +134,14 @@ struct ErrorHandlingAndEdgeCasesTests {
         let filters = try TransactionFilters(
             page: 0,
             pageSize: 0,
-            asc: true,
             orderBy: nil,
+            asc: true,
             createMethodId: nil,
             createdById: nil,
             batchId: nil,
             noBatch: false
         )
-        
+
         #expect(filters.page == 0)
         #expect(filters.pageSize == 0)
         #expect(filters.createMethodId == nil)
@@ -155,14 +155,14 @@ struct ErrorHandlingAndEdgeCasesTests {
         let filters = try TransactionFilters(
             page: largePage,
             pageSize: largePageSize,
-            asc: true,
             orderBy: nil,
+            asc: true,
             createMethodId: nil,
             createdById: nil,
             batchId: nil,
             noBatch: false
         )
-        
+
         #expect(filters.page == largePage)
         #expect(filters.pageSize == largePageSize)
     }
@@ -226,8 +226,8 @@ struct ErrorHandlingAndEdgeCasesTests {
                     try? TransactionFilters(
                         page: i,
                         pageSize: 20,
-                        asc: true,
                         orderBy: nil,
+                        asc: true,
                         createMethodId: nil,
                         createdById: nil,
                         batchId: nil,

@@ -259,9 +259,8 @@ public class AriseMobileTTP {
     /// Example usage:
     /// ```swift
     /// do {
-    ///     let calculation = try await ariseSdk.calculateAmount(
-    ///         request: CalculateAmountRequest(amount: 100.0)
-    ///     )
+    ///     let request = CalculateAmountRequest(amount: 100.0)
+    ///     let calculation = try await ariseSdk.calculateAmount(request: request)
     ///     let result = try await ariseSdk.ttp.performTransaction(
     ///         calculationResult: calculation,
     ///         isDebitCard: false
@@ -269,7 +268,7 @@ public class AriseMobileTTP {
     ///     print("Transaction ID: \(result.transactionId ?? "N/A")")
     ///     print("Status: \(result.status)")
     /// } catch let error as TTPError {
-    ///     print("❌ Transaction failed: \(error.localizedDescription)")
+    ///     print("Transaction failed: \(error.localizedDescription)")
     /// }
     /// ```
     @MainActor

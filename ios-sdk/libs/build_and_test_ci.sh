@@ -21,7 +21,7 @@ PROJECT_NAME="AriseMobileSdk"
 SCHEME_NAME="AriseMobileSdk"
 
 # Framework output name (name of .xcframework and .framework files)
-XCFRAMEWORK_NAME="AriseMobile"
+XCFRAMEWORK_NAME="ARISE"
 FRAMEWORK_NAME="${XCFRAMEWORK_NAME}"
 
 RED='\033[0;31m'
@@ -297,7 +297,7 @@ EOF
     <key>CFBundleVersion</key>
     <string>1</string>
     <key>MinimumOSVersion</key>
-    <string>15.0</string>
+    <string>18.0</string>
 </dict>
 </plist>
 EOF
@@ -351,12 +351,16 @@ EOF
         exit 1
     fi
 
-    # Relink framework without SPM dependencies (double-build trick)
-    if relink_framework_without_spm "$DEVICE_DERIVED_DATA" "iphoneos" "arm64"; then
-        print_success "Device framework relinked without SPM dependencies"
-    else
-        print_warning "Relink failed, using original framework (may have duplicate symbols)"
-    fi
+    # NOTE: Relink disabled - SPM dependencies must be statically linked into xcframework
+    # to avoid "symbol not found in flat namespace" errors at runtime.
+    # The consuming app will link against the same SPM packages, but the symbols
+    # need to be present in the xcframework binary.
+    #
+    # if relink_framework_without_spm "$DEVICE_DERIVED_DATA" "iphoneos" "arm64"; then
+    #     print_success "Device framework relinked without SPM dependencies"
+    # else
+    #     print_warning "Relink failed, using original framework (may have duplicate symbols)"
+    # fi
 
     # Search for framework in DerivedData
     print_status "Searching for framework in DerivedData..."
@@ -404,12 +408,13 @@ EOF
         exit 1
     fi
 
-    # Relink framework without SPM dependencies (double-build trick)
-    if relink_framework_without_spm "$SIMULATOR_DERIVED_DATA" "iphonesimulator" "arm64"; then
-        print_success "Simulator framework relinked without SPM dependencies"
-    else
-        print_warning "Relink failed, using original framework (may have duplicate symbols)"
-    fi
+    # NOTE: Relink disabled - see comment above for device build
+    #
+    # if relink_framework_without_spm "$SIMULATOR_DERIVED_DATA" "iphonesimulator" "arm64"; then
+    #     print_success "Simulator framework relinked without SPM dependencies"
+    # else
+    #     print_warning "Relink failed, using original framework (may have duplicate symbols)"
+    # fi
 
     # Search for framework in DerivedData
     print_status "Searching for framework in DerivedData..."

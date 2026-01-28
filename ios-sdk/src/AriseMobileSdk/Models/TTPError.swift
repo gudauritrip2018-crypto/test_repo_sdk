@@ -2,6 +2,7 @@ import Foundation
 
 /// Errors that can occur during Tap to Pay operations
 public enum TTPError: Error, LocalizedError {
+    case notCompatible([String])
     case notActive(String)
     case sdkNotInitialized
     case configurationFailed(String, String?)
@@ -12,6 +13,8 @@ public enum TTPError: Error, LocalizedError {
     
     public var errorDescription: String? {
         switch self {
+        case .notCompatible(let reasons):
+            return "Device is not compatible with Tap to Pay: \(reasons.joined(separator: "; "))"
         case .notActive(let message):
             return "Tap to Pay is not active: \(message)"
         case .sdkNotInitialized:
@@ -31,6 +34,8 @@ public enum TTPError: Error, LocalizedError {
     
     public var errorCode: String? {
         switch self {
+        case .notCompatible(_):
+            return nil
         case .notActive(_):
             return nil
         case .sdkNotInitialized:

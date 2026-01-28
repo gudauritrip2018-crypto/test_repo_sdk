@@ -73,13 +73,8 @@ public struct PaymentSettingsResponse {
     /// AVS configuration and settings.
     public let avs: AvsOptions?
     
-    // MARK: - Receipt Preferences
-    
-    /// Whether the terminal can save customer's card after transaction processing.
-    ///
-    /// When enabled, allows storing card information for future transactions.
-    public let isCustomerCardSavingByTerminalEnabled: Bool
-    
+    // MARK: - Merchant Info
+
     /// Merchant company name.
     public let companyName: String?
     
@@ -110,7 +105,6 @@ public struct PaymentSettingsResponse {
         availableTransactionTypes: [NamedOption],
         availablePaymentProcessors: [PaymentProcessor],
         avs: AvsOptions?,
-        isCustomerCardSavingByTerminalEnabled: Bool,
         companyName: String? = nil,
         mccCode: String? = nil,
         currencyCode: String? = nil,
@@ -129,7 +123,6 @@ public struct PaymentSettingsResponse {
         self.availableTransactionTypes = availableTransactionTypes
         self.availablePaymentProcessors = availablePaymentProcessors
         self.avs = avs
-        self.isCustomerCardSavingByTerminalEnabled = isCustomerCardSavingByTerminalEnabled
         self.companyName = companyName
         self.mccCode = mccCode
         self.currencyCode = currencyCode

@@ -1,7 +1,7 @@
 import SwiftUI
 import UIKit
 import ProximityReader
-import AriseMobile
+import ARISE
 
 struct ContentView: View {
     @State private var sdkVersion: String = "Loading..."
@@ -406,11 +406,10 @@ struct ContentView: View {
         
         Task {
             do {
-                let authResult = try await ariseSdk.authenticate(clientId: clientId, clientSecret: clientSecret)
+                let success = try await ariseSdk.authenticate(clientId: clientId, clientSecret: clientSecret)
                 await MainActor.run {
-                    self.accessToken = "✅ \(authResult.accessToken.prefix(20))..."
-                    print("accessToken \(authResult.accessToken)")
-                    self.errorMessage = "Authentication successful! Token expires in \(authResult.expiresIn) seconds"
+                    self.accessToken = success ? "✅ Authenticated" : "❌ Authentication failed"
+                    self.errorMessage = success ? "Authentication successful!" : "Authentication failed"
                     self.isLoading = false
                 }
                 await checkToken()
@@ -440,10 +439,10 @@ struct ContentView: View {
         
         Task {
             do {
-                let authResult = try await ariseSdk.refreshAccessToken()
+                let success = try await ariseSdk.refreshAccessToken()
                 await MainActor.run {
-                    self.accessToken = "✅ \(authResult.accessToken.prefix(20))..."
-                    self.errorMessage = "Token refreshed! Expires in \(authResult.expiresIn) seconds"
+                    self.accessToken = success ? "✅ Token refreshed" : "❌ Token refresh failed"
+                    self.errorMessage = success ? "Token refreshed successfully!" : "Token refresh failed"
                     self.isLoading = false
                 }
                 await checkToken()

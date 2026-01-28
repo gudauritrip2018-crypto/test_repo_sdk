@@ -1,5 +1,5 @@
 import SwiftUI
-import AriseMobile
+import ARISE
 
 struct TransactionDetailView: View {
     let transactionId: String

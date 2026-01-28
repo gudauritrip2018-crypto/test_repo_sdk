@@ -1,6 +1,6 @@
 import Foundation
 import Testing
-@testable import AriseMobile
+@testable import ARISE
 
 /// Tests for EnvironmentSettings enum
 struct EnvironmentSettingsTests {
@@ -136,7 +136,7 @@ struct EnvironmentSettingsTests {
         let settings = EnvironmentSettings.production
         let profileId = settings.terminalProfileId
         #expect(!profileId.isEmpty)
-        #expect(profileId == "4c840000-0000-0000-03c2-7fcd696e5616")
+        #expect(profileId == "4c840000-0000-0000-07d9-fb2869738e05")
     }
 
     @Test("UAT terminalProfileId is set")
@@ -144,7 +144,7 @@ struct EnvironmentSettingsTests {
         let settings = EnvironmentSettings.uat
         let profileId = settings.terminalProfileId
         #expect(!profileId.isEmpty)
-        #expect(profileId == "4c840000-0000-0000-03c2-7fcd696e5616")
+        #expect(profileId == "4c840000-0000-0000-07d9-fb2869738e05")
     }
     
     @Test("terminalProfileId is valid UUID format")

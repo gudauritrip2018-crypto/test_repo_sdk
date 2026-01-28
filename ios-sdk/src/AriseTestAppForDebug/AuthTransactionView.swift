@@ -1,5 +1,5 @@
 import SwiftUI
-import AriseMobile
+import ARISE
 
 struct AuthTransactionView: View {
     private enum PriceMode: String, CaseIterable {
@@ -26,7 +26,7 @@ struct AuthTransactionView: View {
     @State private var ariseSdk: AriseMobileSdk?
     @State private var isLoading: Bool = false
     @State private var errorMessage: String = ""
-    @State private var result: AuthorizationResponse?
+    @State private var result: CardTransactionResponse?
     @State private var showResultDetails: Bool = false
     @State private var selectedTransactionId: String?
     
@@ -669,22 +669,21 @@ struct AuthTransactionView: View {
             return
         }
 
-        let request = CalculateAmountRequest(
-            amount: amountValue,
-            percentageOffRate: parseDouble(percentageOffRate),
-            surchargeRate: parseDouble(surchargeRate),
-            tipAmount: parseDouble(tipAmount),
-            tipRate: parseDouble(tipRate),
-            currencyId: parseInt32(currencyId),
-            useCardPrice: priceMode.boolValue
-        )
-
         isCalculatingAmount = true
         calculationErrorMessage = ""
         calculationResult = nil
 
         Task {
             do {
+                let request = CalculateAmountRequest(
+                    amount: amountValue,
+                    currencyId: parseInt32(currencyId) ?? 1,
+                    percentageOffRate: parseDouble(percentageOffRate),
+                    surchargeRate: parseDouble(surchargeRate),
+                    tipAmount: parseDouble(tipAmount),
+                    tipRate: parseDouble(tipRate),
+                    useCardPrice: priceMode.boolValue
+                )
                 let response = try await ariseSdk.calculateAmount(request: request)
                 await MainActor.run {
                     self.calculationResult = response
@@ -759,16 +758,16 @@ struct AuthTransactionView: View {
                 let surchargeRateValue = parseDouble(surchargeRate)
                 let currencyValue = parseInt32(currencyId) ?? 1
 
-                let input = try AuthorizationRequest(
+                let input = try CardTransactionRequest(
                     paymentProcessorId: paymentProcessorId,
                     amount: amountValue,
                     currencyId: currencyValue,
                     cardDataSource: CardDataSource(rawValue: Int(cardDataSourceValue) ?? CardDataSource.manual.rawValue) ?? .manual,
                     paymentMethodId: paymentMethodId.isEmpty ? nil : paymentMethodId,
                     accountNumber: accountNumber.isEmpty ? nil : accountNumber,
-                    securityCode: securityCode.isEmpty ? nil : securityCode,
                     expirationMonth: expirationMonth.isEmpty ? nil : Int32(expirationMonth),
                     expirationYear: expirationYear.isEmpty ? nil : Int32(expirationYear),
+                    securityCode: securityCode.isEmpty ? nil : securityCode,
                     track1: nil,
                     track2: nil,
                     emvTags: nil,

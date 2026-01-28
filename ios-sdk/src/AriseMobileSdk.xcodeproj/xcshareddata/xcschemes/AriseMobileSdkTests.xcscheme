@@ -30,8 +30,8 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "DC25D2452EAF7A9B00F942C7"
-               BuildableName = "AriseMobile.framework"
-               BlueprintName = "AriseMobile"
+               BuildableName = "ARISE.framework"
+               BlueprintName = "ARISE"
                ReferencedContainer = "container:AriseMobileSdk.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
@@ -48,8 +48,8 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "DC25D2452EAF7A9B00F942C7"
-            BuildableName = "AriseMobile.framework"
-            BlueprintName = "AriseMobile"
+            BuildableName = "ARISE.framework"
+            BlueprintName = "ARISE"
             ReferencedContainer = "container:AriseMobileSdk.xcodeproj">
          </BuildableReference>
       </MacroExpansion>
@@ -57,8 +57,8 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "DC25D2452EAF7A9B00F942C7"
-            BuildableName = "AriseMobile.framework"
-            BlueprintName = "AriseMobile"
+            BuildableName = "ARISE.framework"
+            BlueprintName = "ARISE"
             ReferencedContainer = "container:AriseMobileSdk.xcodeproj">
          </BuildableReference>
       </CodeCoverageTargets>

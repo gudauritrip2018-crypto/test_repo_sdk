@@ -1,6 +1,6 @@
 import Foundation
 import Testing
-@testable import AriseMobile
+@testable import ARISE
 
 /// Tests for TransactionsService functionality
 struct TransactionsServiceTests {
@@ -61,8 +61,8 @@ struct TransactionsServiceTests {
         let filters = try? TransactionFilters(
             page: 0,
             pageSize: 10,
-            asc: true,
             orderBy: "transactionDateTime",
+            asc: true,
             createMethodId: nil,
             createdById: nil,
             batchId: nil,
@@ -146,17 +146,17 @@ struct TransactionsServiceTests {
         let service = createTransactionsService()
         
         // Create a minimal authorization request
-        let request: AuthorizationRequest
+        let request: CardTransactionRequest
         do {
-            request = try AuthorizationRequest(
+            request = try CardTransactionRequest(
                 paymentProcessorId: "test-processor-id",
                 amount: 100.0,
                 currencyId: 1, // USD
                 cardDataSource: .manual,
                 accountNumber: "4111111111111111",
-                securityCode: "123",
                 expirationMonth: 12,
-                expirationYear: 2025
+                expirationYear: 2025,
+                securityCode: "123"
             )
         } catch {
             Issue.record("Failed to create AuthorizationRequest: \(error)")
@@ -178,17 +178,17 @@ struct TransactionsServiceTests {
     func testSubmitAuthTransactionHandlesNetworkErrors() async {
         let service = createTransactionsService()
         
-        let request: AuthorizationRequest
+        let request: CardTransactionRequest
         do {
-            request = try AuthorizationRequest(
+            request = try CardTransactionRequest(
                 paymentProcessorId: "test-processor-id",
                 amount: 100.0,
                 currencyId: 1,
                 cardDataSource: .manual,
                 accountNumber: "4111111111111111",
-                securityCode: "123",
                 expirationMonth: 12,
-                expirationYear: 2025
+                expirationYear: 2025,
+                securityCode: "123"
             )
         } catch {
             Issue.record("Failed to create AuthorizationRequest: \(error)")
@@ -211,17 +211,17 @@ struct TransactionsServiceTests {
         let service = createTransactionsService()
         
         // Create a minimal sale request
-        let request: AuthorizationRequest
+        let request: CardTransactionRequest
         do {
-            request = try AuthorizationRequest(
+            request = try CardTransactionRequest(
                 paymentProcessorId: "test-processor-id",
                 amount: 100.0,
                 currencyId: 1, // USD
                 cardDataSource: .manual,
                 accountNumber: "4111111111111111",
-                securityCode: "123",
                 expirationMonth: 12,
-                expirationYear: 2025
+                expirationYear: 2025,
+                securityCode: "123"
             )
         } catch {
             Issue.record("Failed to create AuthorizationRequest: \(error)")
@@ -243,17 +243,17 @@ struct TransactionsServiceTests {
     func testSubmitSaleTransactionHandlesNetworkErrors() async {
         let service = createTransactionsService()
         
-        let request: AuthorizationRequest
+        let request: CardTransactionRequest
         do {
-            request = try AuthorizationRequest(
+            request = try CardTransactionRequest(
                 paymentProcessorId: "test-processor-id",
                 amount: 100.0,
                 currencyId: 1,
                 cardDataSource: .manual,
                 accountNumber: "4111111111111111",
-                securityCode: "123",
                 expirationMonth: 12,
-                expirationYear: 2025
+                expirationYear: 2025,
+                securityCode: "123"
             )
         } catch {
             Issue.record("Failed to create AuthorizationRequest: \(error)")
@@ -422,14 +422,13 @@ struct TransactionsServiceTests {
         // Create a calculate amount request
         let request = CalculateAmountRequest(
             amount: 100.0,
+            currencyId: 1,
             percentageOffRate: nil,
             surchargeRate: nil,
             tipAmount: nil,
-            tipRate: nil,
-            currencyId: nil,
-            useCardPrice: nil
+            tipRate: nil
         )
-        
+
         // Note: This test will fail if there's no network or authentication
         do {
             let response = try await service.calculateAmount(request: request)
@@ -440,20 +439,19 @@ struct TransactionsServiceTests {
             #expect(error != nil)
         }
     }
-    
+
     @Test("calculateAmount with all parameters")
     func testCalculateAmountWithAllParameters() async {
         let service = createTransactionsService()
-        
+
         // Create a calculate amount request with all parameters
         let request = CalculateAmountRequest(
             amount: 100.0,
+            currencyId: 1, // USD
             percentageOffRate: 5.0,
             surchargeRate: 3.0,
             tipAmount: 10.0,
-            tipRate: nil,
-            currencyId: 1, // USD
-            useCardPrice: true
+            tipRate: nil
         )
         
         // Note: This test will fail if there's no network or authentication
@@ -473,14 +471,13 @@ struct TransactionsServiceTests {
         
         let request = CalculateAmountRequest(
             amount: 100.0,
+            currencyId: 1,
             percentageOffRate: nil,
             surchargeRate: nil,
             tipAmount: nil,
-            tipRate: nil,
-            currencyId: nil,
-            useCardPrice: nil
+            tipRate: nil
         )
-        
+
         do {
             _ = try await service.calculateAmount(request: request)
             Issue.record("Expected error but got success")

@@ -1,6 +1,6 @@
 import Foundation
 import CoreLocation
-@testable import AriseMobile
+@testable import ARISE
 
 /// Mock implementation of CLLocationManager for testing location permissions
 final class MockLocationManager: CLLocationManager {

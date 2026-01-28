@@ -1,6 +1,6 @@
 import Foundation
 import Testing
-@testable import AriseMobile
+@testable import ARISE
 
 /// Tests for AriseMobileSdk public API methods
 /// 
@@ -299,8 +299,8 @@ struct AriseMobileSdkPublicAPITests {
         let filters = try TransactionFilters(
             page: 0,
             pageSize: 20,
-            asc: true,
-            orderBy: "date"
+            orderBy: "date",
+            asc: true
         )
         do {
             _ = try await sdk.getTransactions(filters: filters)
@@ -351,15 +351,15 @@ struct AriseMobileSdkPublicAPITests {
         
         // This test verifies that submitAuthTransaction method exists and can be called
         // In a real scenario, we would mock TransactionsService to verify delegation
-        let request = try AuthorizationRequest(
+        let request = try CardTransactionRequest(
             paymentProcessorId: "test-processor-id",
             amount: 100.0,
             currencyId: 1,
             cardDataSource: .manual,
             accountNumber: "4111111111111111",
-            securityCode: "123",
             expirationMonth: 12,
-            expirationYear: 25
+            expirationYear: 25,
+            securityCode: "123"
         )
         
         do {
@@ -380,15 +380,15 @@ struct AriseMobileSdkPublicAPITests {
         
         // This test verifies that submitSaleTransaction method exists and can be called
         // In a real scenario, we would mock TransactionsService to verify delegation
-        let request = try AuthorizationRequest(
+        let request = try CardTransactionRequest(
             paymentProcessorId: "test-processor-id",
             amount: 100.0,
             currencyId: 1,
             cardDataSource: .manual,
             accountNumber: "4111111111111111",
-            securityCode: "123",
             expirationMonth: 12,
-            expirationYear: 25
+            expirationYear: 25,
+            securityCode: "123"
         )
         
         do {
@@ -411,10 +411,10 @@ struct AriseMobileSdkPublicAPITests {
         // In a real scenario, we would mock TransactionsService to verify delegation
         let request = CalculateAmountRequest(
             amount: 100.0,
+            currencyId: 1,
             percentageOffRate: 5.0,
             surchargeRate: 3.0,
-            tipAmount: 10.0,
-            useCardPrice: true
+            tipAmount: 10.0
         )
         
         do {

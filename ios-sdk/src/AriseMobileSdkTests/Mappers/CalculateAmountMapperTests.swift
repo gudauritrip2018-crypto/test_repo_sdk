@@ -1,6 +1,6 @@
 import Foundation
 import Testing
-@testable import AriseMobile
+@testable import ARISE
 
 /// Tests for CalculateAmountMapper
 struct CalculateAmountMapperTests {
@@ -9,12 +9,11 @@ struct CalculateAmountMapperTests {
     func testCalculateAmountMapperToGeneratedInput() {
         let request = CalculateAmountRequest(
             amount: 100.0,
+            currencyId: 1,
             percentageOffRate: 10.0,
             surchargeRate: 3.0,
             tipAmount: 15.0,
-            tipRate: 15.0,
-            currencyId: 1,
-            useCardPrice: true
+            tipRate: 15.0
         )
         
         let result = CalculateAmountMapper.toGeneratedInput(request)
@@ -32,23 +31,23 @@ struct CalculateAmountMapperTests {
     func testCalculateAmountMapperWithNilFields() {
         let request = CalculateAmountRequest(
             amount: 50.0,
+            currencyId: 1,
             percentageOffRate: nil,
             surchargeRate: nil,
             tipAmount: nil,
-            tipRate: nil,
-            currencyId: nil,
-            useCardPrice: false
+            tipRate: nil
         )
-        
+
         let result = CalculateAmountMapper.toGeneratedInput(request)
-        
+
         #expect(result.query.amount == 50.0)
+        #expect(result.query.currencyId == 1)
         #expect(result.query.percentageOffRate == nil)
         #expect(result.query.surchargeRate == nil)
         #expect(result.query.tipAmount == nil)
         #expect(result.query.tipRate == nil)
-        #expect(result.query.currencyId == nil)
-        #expect(result.query.useCardPrice == false)
+        // useCardPrice is always hardcoded to true in the mapper
+        #expect(result.query.useCardPrice == true)
     }
     
     @Test("CalculateAmountMapper maps response to model with all fields")

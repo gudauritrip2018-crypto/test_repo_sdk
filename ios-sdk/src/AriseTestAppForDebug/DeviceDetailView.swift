@@ -1,5 +1,5 @@
 import SwiftUI
-import AriseMobile
+import ARISE
 
 struct DeviceDetailView: View {
     let ariseSdk: AriseMobileSdk?
@@ -69,7 +69,7 @@ struct DeviceDetailView: View {
     private func deviceInfoView(_ device: DeviceInfo) -> some View {
         VStack(alignment: .leading, spacing: 20) {
             // Device ID
-            infoSection(title: "Device ID", value: device.deviceId ?? "N/A")
+            infoSection(title: "Device ID", value: device.deviceId)
             
             Divider()
             

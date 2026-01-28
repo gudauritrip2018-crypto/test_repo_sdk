@@ -2,7 +2,7 @@ import Foundation
 
 public struct DeviceInfo: Sendable {
     /// Device Id.
-    public let deviceId: String?
+    public let deviceId: String
     /// Device name.
     public let deviceName: String?
     /// Last login time.

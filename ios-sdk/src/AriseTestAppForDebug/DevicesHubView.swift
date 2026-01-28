@@ -1,5 +1,5 @@
 import SwiftUI
-import AriseMobile
+import ARISE
 
 struct DevicesHubView: View {
     let ariseSdk: AriseMobileSdk?
@@ -77,7 +77,7 @@ struct DevicesHubView: View {
                     .foregroundColor(.secondary)
             } else {
                 List(devices, id: \.deviceId) { device in
-                    NavigationLink(destination: DeviceDetailView(ariseSdk: ariseSdk, deviceId: device.deviceId ?? "")) {
+                    NavigationLink(destination: DeviceDetailView(ariseSdk: ariseSdk, deviceId: device.deviceId)) {
                         VStack(alignment: .leading, spacing: 4) {
                             Text(device.deviceName ?? "Unknown device")
                                 .font(.headline)

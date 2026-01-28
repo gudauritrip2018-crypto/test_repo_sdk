@@ -1,6 +1,6 @@
 import Foundation
 import UIKit
-@testable import AriseMobile
+@testable import ARISE
 
 /// Mock implementation of TTPServiceProtocol for testing
 final class MockTTPService: TTPServiceProtocol, @unchecked Sendable {

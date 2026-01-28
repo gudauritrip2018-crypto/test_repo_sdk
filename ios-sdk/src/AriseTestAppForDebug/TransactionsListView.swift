@@ -1,5 +1,5 @@
 import SwiftUI
-import AriseMobile
+import ARISE
 
 struct TransactionsListView: View {
     @State private var filters: TransactionFilters?
@@ -317,8 +317,8 @@ struct TransactionsListView: View {
             builtFilters = try TransactionFilters(
                 page: Int(page).flatMap { $0 >= 0 ? $0 : nil },
                 pageSize: Int(pageSize).flatMap { $0 > 0 ? $0 : nil },
-                asc: asc,
                 orderBy: orderBy.isEmpty ? nil : orderBy,
+                asc: asc,
                 createMethodId: createMethodId,
                 createdById: createdById.isEmpty ? nil : createdById,
                 batchId: batchId.isEmpty ? nil : batchId,

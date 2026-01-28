@@ -139,7 +139,7 @@ The standalone test app in `test-app/` is for testing the ready-built framework:
 
 ## Requirements
 
-- iOS 15.0+
+- iOS 18.0+
 - Xcode 15.0+
 - Swift 5.9+
 
@@ -235,18 +235,54 @@ The CI workflow will automatically detect that the plist major version is higher
 
 1. **Create distribution repository** (empty repo for SPM distribution)
 
-2. **Create Personal Access Token**:
-   - GitHub → Settings → Developer settings → Personal access tokens → Tokens (classic)
-   - Generate new token with `repo` scope
+2. **Create GitHub App**
 
-3. **Add repository secrets** (Settings → Secrets and variables → Actions → New repository secret):
+   GitHub App provides better security with scoped permissions and automatic token rotation.
 
-   | Secret | Value |
-   |--------|-------|
-   | `DISTRIBUTION_REPO` | `your-org/sdk-distribution` |
-   | `DISTRIBUTION_REPO_TOKEN` | `ghp_xxxxxxxxxxxx` |
+   **Step 1: Create GitHub App**
+   - Go to GitHub → Settings → Developer settings → GitHub Apps → New GitHub App
+   - App name: `iOS SDK Distribution Bot`
+   - Homepage URL: `https://github.com/aurora-payments/arise-merchant-app`
+   - Uncheck "Webhook" → Active
+   - Permissions → Repository permissions:
+     - Contents: **Read and write**
+     - Metadata: **Read-only**
+   - Where can this app be installed: **Only on this account**
+   - Click "Create GitHub App"
 
-4. **Enable Actions** (Settings → Actions → General):
+   **Step 2: Get App ID**
+   - After creation, you'll see the App settings page
+   - **App ID** is displayed at the top (e.g., `1234567`)
+   - Copy this value for `DISTRIBUTION_APP_ID` secret
+
+   **Step 3: Generate Private Key**
+   - On the same App settings page, scroll down to **"Private keys"** section
+   - Click **"Generate a private key"**
+   - A `.pem` file will be downloaded automatically (e.g., `ios-sdk-distribution-bot.2024-01-15.private-key.pem`)
+   - Open the file in a text editor
+   - Copy the **entire content** including `-----BEGIN RSA PRIVATE KEY-----` and `-----END RSA PRIVATE KEY-----`
+   - This is your `DISTRIBUTION_APP_PRIVATE_KEY` secret value
+
+   **Step 4: Install the App**
+   - Go to GitHub App settings → Install App
+   - Select `aurora-payments` organization
+   - Choose "Only select repositories"
+   - Select only `arise-mobile-ios-sdk` repository
+   - Click Install
+
+   **Step 5: Add secrets to source repository**
+
+   Go to `arise-merchant-app` repo → Settings → Secrets and variables → Actions → New repository secret
+
+   | Secret                         | Value                                  | Description                |
+   |--------------------------------|----------------------------------------|----------------------------|
+   | `DISTRIBUTION_APP_ID`          | `1234567`                              | GitHub App ID from Step 2  |
+   | `DISTRIBUTION_APP_PRIVATE_KEY` | `-----BEGIN RSA PRIVATE KEY-----...`   | Full .pem file content     |
+   | `DISTRIBUTION_REPO`            | `aurora-payments/arise-mobile-ios-sdk` | Full repo path             |
+   | `DISTRIBUTION_REPO_OWNER`      | `aurora-payments`                      | Organization name          |
+   | `DISTRIBUTION_REPO_NAME`       | `arise-mobile-ios-sdk`                 | Repository name only       |
+
+3. **Enable Actions** (Settings → Actions → General):
    - Allow all actions
    - Workflow permissions: Read and write
 

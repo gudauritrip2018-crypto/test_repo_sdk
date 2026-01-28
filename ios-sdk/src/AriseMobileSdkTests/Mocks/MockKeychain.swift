@@ -1,5 +1,5 @@
 import Foundation
-@testable import AriseMobile
+@testable import ARISE
 
 /// Mock implementation of Keychain storage for testing
 final class MockKeychain: @unchecked Sendable {

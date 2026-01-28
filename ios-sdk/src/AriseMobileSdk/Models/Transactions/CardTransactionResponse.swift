@@ -5,19 +5,19 @@ import Foundation
 /// Represents the response payload shared by authorization and sale endpoints.
 /// Contains transaction status, authorization code, receipt information, and optional AVS details.
 ///
-public struct AuthorizationResponse {
+public struct CardTransactionResponse {
     // MARK: - Transaction Identification
     
     /// Unique transaction identifier
     ///
-    /// Unique identifier of the authorized transaction.
-    /// Use this ID for subsequent operations like capture or void.
+    /// Unique identifier of the transaction.
+    /// Use this ID for subsequent operations like capture, void, or refund.
     ///
     public let transactionId: String?
     
     /// Date and time of transaction execution
     ///
-    /// Date of execution when the authorization was processed.
+    /// Date of execution when the transaction was processed.
     /// Format: ISO 8601 date-time
     ///
     public let transactionDateTime: Date?
@@ -26,13 +26,13 @@ public struct AuthorizationResponse {
     
     /// Transaction type identifier
     ///
-    /// Type id of transaction (e.g., 1 = Authorization).
+    /// Type id of transaction (e.g., 1 = Authorization, 2 = Sale).
     ///
     public let typeId: Int32?
     
     /// Transaction type name
     ///
-    /// Type name of transaction (e.g., "Authorization").
+    /// Type name of transaction (e.g., "Authorization", "Sale").
     ///
     public let type: String?
     
@@ -52,10 +52,10 @@ public struct AuthorizationResponse {
     
     /// Processed amount
     ///
-    /// Indicates which amount is authorized. The amount may differ from the amount in the request
+    /// Indicates which amount was processed. The amount may differ from the amount in the request
     /// due to surcharges, discounts, or other adjustments applied during processing.
     ///
-    /// - Important: This is the actual amount that was authorized, which may differ from the requested amount
+    /// - Important: This is the actual amount that was processed, which may differ from the requested amount
     public let processedAmount: Double?
     
     // MARK: - Transaction Details

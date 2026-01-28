@@ -9,7 +9,7 @@ internal struct CalculateAmountMapper {
             tipAmount: request.tipAmount,
             tipRate: request.tipRate,
             currencyId: request.currencyId,
-            useCardPrice: request.useCardPrice
+            useCardPrice: true
         )
 
         return .init(query: query)

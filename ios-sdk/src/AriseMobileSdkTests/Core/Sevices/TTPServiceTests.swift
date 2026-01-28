@@ -2,7 +2,7 @@ import Foundation
 import Testing
 import CloudCommerce
 import UIKit
-@testable import AriseMobile
+@testable import ARISE
 
 /// Tests for TTPService functionality
 ///
@@ -21,15 +21,16 @@ struct TTPServiceTests {
         mockDevicesService: DevicesServiceProtocol? = MockDevicesService(),
         mockSettingsService: SettingsServiceProtocol? = MockSettingsService(),
         mockTransactionsService: TransactionsServiceProtocol? = MockTransactionsService(),
-        environment: EnvironmentSettings = .uat
+        environment: EnvironmentSettings = .uat,
+        skipCompatibilityCheck: Bool = true
     ) -> TTPService {
         // Use provided mocks - all services are mocked by default
         // This ensures no real network calls are made during tests
         let devicesService: DevicesServiceProtocol = mockDevicesService ?? MockDevicesService()
         let settingsService: SettingsServiceProtocol = mockSettingsService ?? MockSettingsService()
         let transactionsService: TransactionsServiceProtocol = mockTransactionsService ?? MockTransactionsService()
-        
-        return TTPService(
+
+        let service = TTPService(
             devicesService: devicesService,
             settingsService: settingsService,
             transactionsService: transactionsService,
@@ -37,6 +38,10 @@ struct TTPServiceTests {
             cloudCommerceSDK: mockCloudCommerceSDK,
             tokenStorage: mockTokenStorage
         )
+        // Skip compatibility check by default in tests since device/location checks
+        // cannot be mocked and will fail in the test environment
+        service.skipCompatibilityCheckForTesting = skipCompatibilityCheck
+        return service
     }
     
     // MARK: - checkCompatibility() Tests
@@ -307,6 +312,19 @@ struct TTPServiceTests {
         }
     }
     
+    @Test("activate throws notCompatible error when device compatibility check fails")
+    func testActivateNotCompatible() async {
+        // Create service with compatibility check enabled (not skipped)
+        let service = createTTPService(skipCompatibilityCheck: false)
+
+        // In test environment, compatibility check will fail due to:
+        // - Location permission not granted (undetermined in tests)
+        // - Potentially other checks (device model, entitlements)
+        await #expect(throws: TTPError.self) {
+            try await service.activate()
+        }
+    }
+
     @Test("activate throws error when configuration fails")
     func testActivateConfigurationFailed() async {
         let mockCloudCommerceSDK = MockCloudCommerceSDK()
@@ -803,7 +821,6 @@ struct TTPServiceTests {
             availableTransactionTypes: [],
             availablePaymentProcessors: [],
             avs: nil,
-            isCustomerCardSavingByTerminalEnabled: false,
             companyName: "Test Company",
             mccCode: "1234",
             currencyCode: "USD",
@@ -1015,7 +1032,6 @@ struct TTPServiceTests {
             availableTransactionTypes: [],
             availablePaymentProcessors: [],
             avs: nil,
-            isCustomerCardSavingByTerminalEnabled: false,
             companyName: "Test Company",
             mccCode: "1234",
             currencyCode: "USD",
@@ -1107,7 +1123,6 @@ struct TTPServiceTests {
             availableTransactionTypes: [],
             availablePaymentProcessors: [],
             avs: nil,
-            isCustomerCardSavingByTerminalEnabled: false,
             companyName: "Test Company",
             mccCode: "1234",
             currencyCode: nil, // Missing currency code
@@ -1207,7 +1222,6 @@ private func createMockPaymentSettings() -> PaymentSettingsResponse {
         availableTransactionTypes: [],
         availablePaymentProcessors: [],
         avs: nil,
-        isCustomerCardSavingByTerminalEnabled: false,
         companyName: "Test Company",
         mccCode: "1234",
         currencyCode: "USD",

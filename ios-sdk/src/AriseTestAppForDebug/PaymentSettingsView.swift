@@ -1,5 +1,5 @@
 import SwiftUI
-import AriseMobile
+import ARISE
 
 struct PaymentSettingsView: View {
     @State private var isLoading: Bool = false
@@ -347,16 +347,6 @@ struct PaymentSettingsView: View {
                             }
                         }
                         
-                        // Receipt Preferences
-                        SettingsSection(title: "Receipt Preferences", icon: "printer.fill", color: .gray) {
-                            HStack {
-                                Text("Customer Card Saving Enabled:")
-                                Spacer()
-                                Text(settings.isCustomerCardSavingByTerminalEnabled ? "Yes" : "No")
-                                    .fontWeight(.semibold)
-                                    .foregroundColor(settings.isCustomerCardSavingByTerminalEnabled ? .green : .red)
-                            }
-                        }
                     }
                     .padding()
                     .background(Color.green.opacity(0.1))

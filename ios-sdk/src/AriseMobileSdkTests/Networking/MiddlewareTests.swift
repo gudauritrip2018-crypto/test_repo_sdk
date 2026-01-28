@@ -2,7 +2,7 @@ import Foundation
 import Testing
 import OpenAPIRuntime
 import HTTPTypes
-@testable import AriseMobile
+@testable import ARISE
 
 /// Tests for Networking Middleware functionality
 struct MiddlewareTests {
@@ -179,7 +179,7 @@ struct MiddlewareTests {
             _ = try await middleware.intercept(request, body: nil, baseURL: baseURL, operationID: "test", next: next)
             Issue.record("Expected error")
         } catch let error as AriseApiError {
-            #expect(error.localizedDescription.contains("Bad request"))
+            #expect(error.localizedDescription.contains("BadRequest"))
         } catch {
             Issue.record("Unexpected error type: \(error)")
         }

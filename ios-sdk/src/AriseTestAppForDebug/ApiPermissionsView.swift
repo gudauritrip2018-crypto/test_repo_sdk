@@ -1,5 +1,5 @@
 import SwiftUI
-import AriseMobile
+import ARISE
 
 struct ApiPermissionsView: View {
     @State private var isLoading: Bool = false

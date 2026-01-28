@@ -4,7 +4,7 @@ import CloudCommerce
 #if canImport(ProximityReader)
 import ProximityReader
 #endif
-@testable import AriseMobile
+@testable import ARISE
 
 /// Tests for TTPEventMapper
 /// 

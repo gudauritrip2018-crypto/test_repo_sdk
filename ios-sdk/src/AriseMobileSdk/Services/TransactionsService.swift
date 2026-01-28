@@ -42,7 +42,7 @@ class TransactionsService: BaseApiClient, TransactionsServiceProtocol, @unchecke
         }
     }
         
-    func submitAuthTransaction(request: AuthorizationRequest) async throws -> AuthorizationResponse {
+    func submitAuthTransaction(request: CardTransactionRequest) async throws -> CardTransactionResponse {
         
         let client = try getApiClient()
         let generatedInput = AuthorizationTransactionMapper.toGeneratedInput(request)
@@ -58,7 +58,7 @@ class TransactionsService: BaseApiClient, TransactionsServiceProtocol, @unchecke
         }
     }
     
-    func submitSaleTransaction(request: AuthorizationRequest) async throws -> AuthorizationResponse {
+    func submitSaleTransaction(request: CardTransactionRequest) async throws -> CardTransactionResponse {
         let client = try getApiClient()
         let generatedInput = SaleTransactionMapper.toGeneratedInput(request)
         

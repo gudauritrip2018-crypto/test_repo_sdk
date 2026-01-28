@@ -1,10 +1,11 @@
 import Foundation
 
-/// Input parameters for submitting an authorization transaction
+/// Input parameters for card transactions (Authorization or Sale)
 ///
-/// Represents the required and optional parameters for authorizing a payment without immediate capture.
+/// Represents the required and optional parameters for processing card transactions.
+/// Used by both `submitAuthorizationTransaction` and `submitSaleTransaction` methods.
 ///
-public struct AuthorizationRequest {
+public struct CardTransactionRequest {
     
     // MARK: - Required Fields
     
@@ -57,27 +58,27 @@ public struct AuthorizationRequest {
     ///
     /// - Note: Required if `paymentMethodId` is not provided
     public let accountNumber: String?
-    
-    /// Security code (CVV/CVC)
-    ///
-    /// The three or four digit security code on the credit card.
-    /// Required for card-not-present transactions when using `accountNumber`.
-    ///
-    public let securityCode: String?
-    
+
     /// Expiration month
     ///
     /// The expiration month of the card (1-12).
     /// Required when using `accountNumber`.
     ///
     public let expirationMonth: Int32?
-    
+
     /// Expiration year
     ///
     /// The expiration year of the card (2-digit or 4-digit format).
     /// Required when using `accountNumber`.
     ///
     public let expirationYear: Int32?
+
+    /// Security code (CVV/CVC)
+    ///
+    /// The three or four digit security code on the credit card.
+    /// Required for card-not-present transactions when using `accountNumber`.
+    ///
+    public let securityCode: String?
     
     // MARK: - Track Data (for Swipe/Contactless)
     
@@ -146,15 +147,7 @@ public struct AuthorizationRequest {
     /// The percent of transaction amount to be added to Amount after PercentageOffRate is applied (e.g., 3.0 for 3% surcharge).
     ///
     public let surchargeRate: Double?
-    
-    /// Use card price flag
-    ///
-    /// Parameter is mandatory when merchant has ZeroCostProcessingOption == Dual Pricing.
-    /// Parameter must be null when merchant has other ZeroCostProcessingOption.
-    /// For Dual Pricing, amount should be the card price and useCardPrice should be "true", or amount should be the cash price and useCardPrice should be "false".
-    ///
-    public let useCardPrice: Bool?
-    
+
     // MARK: - Address Information
     
     /// Billing address
@@ -234,7 +227,7 @@ public struct AuthorizationRequest {
     
     // MARK: - Initialization
     
-    /// Initialize authorization transaction input
+    /// Initialize card transaction request
     ///
     /// - Parameters:
     ///   - paymentProcessorId: Payment processor identifier (required)
@@ -243,9 +236,9 @@ public struct AuthorizationRequest {
     ///   - cardDataSource: Card data source (required)
     ///   - paymentMethodId: Stored payment method ID (optional, alternative to card details)
     ///   - accountNumber: Card number (optional, required if paymentMethodId is nil)
-    ///   - securityCode: CVV/CVC (optional, recommended for card-not-present)
     ///   - expirationMonth: Expiration month 1-12 (optional, required if accountNumber is provided)
     ///   - expirationYear: Expiration year (optional, required if accountNumber is provided)
+    ///   - securityCode: CVV/CVC (optional, recommended for card-not-present)
     ///   - track1: Track 1 data (optional, for swipe transactions)
     ///   - track2: Track 2 data (optional, for swipe/contactless transactions)
     ///   - emvTags: EMV tags array (optional, for chip/contactless transactions)
@@ -255,7 +248,6 @@ public struct AuthorizationRequest {
     ///   - tipRate: Tip rate percentage (optional)
     ///   - percentageOffRate: Discount percentage (optional)
     ///   - surchargeRate: Surcharge percentage (optional)
-    ///   - useCardPrice: Use card price flag for dual pricing (optional)
     ///   - billingAddress: Billing address (optional)
     ///   - shippingAddress: Shipping address (optional)
     ///   - contactInfo: Contact information (optional)
@@ -273,9 +265,9 @@ public struct AuthorizationRequest {
         cardDataSource: CardDataSource,
         paymentMethodId: String? = nil,
         accountNumber: String? = nil,
-        securityCode: String? = nil,
         expirationMonth: Int32? = nil,
         expirationYear: Int32? = nil,
+        securityCode: String? = nil,
         track1: String? = nil,
         track2: String? = nil,
         emvTags: [String]? = nil,
@@ -285,7 +277,6 @@ public struct AuthorizationRequest {
         tipRate: Double? = nil,
         percentageOffRate: Double? = nil,
         surchargeRate: Double? = nil,
-        useCardPrice: Bool? = nil,
         billingAddress: AddressDto? = nil,
         shippingAddress: AddressDto? = nil,
         contactInfo: ContactInfoDto? = nil,
@@ -305,9 +296,9 @@ public struct AuthorizationRequest {
         self.cardDataSource = cardDataSource
         self.paymentMethodId = paymentMethodId
         self.accountNumber = accountNumber
-        self.securityCode = securityCode
         self.expirationMonth = expirationMonth
         self.expirationYear = expirationYear
+        self.securityCode = securityCode
         self.track1 = track1
         self.track2 = track2
         self.emvTags = emvTags
@@ -317,7 +308,6 @@ public struct AuthorizationRequest {
         self.tipRate = tipRate
         self.percentageOffRate = percentageOffRate
         self.surchargeRate = surchargeRate
-        self.useCardPrice = useCardPrice
         self.billingAddress = billingAddress
         self.shippingAddress = shippingAddress
         self.contactInfo = contactInfo

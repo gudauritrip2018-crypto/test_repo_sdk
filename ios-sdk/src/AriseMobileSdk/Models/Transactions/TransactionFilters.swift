@@ -19,17 +19,17 @@ public struct TransactionFilters {
     /// - Validation: Must be between 1 and 100
     public let pageSize: Int?
     
-    /// Sort order
-    /// 
-    /// If true - sort by ascending, if false - sort by descending
-    /// 
-    public let asc: Bool?
-    
     /// Field to order by
-    /// 
+    ///
     /// Field name to use for sorting transactions
-    /// 
+    ///
     public let orderBy: String?
+
+    /// Sort order
+    ///
+    /// If true - sort by ascending, if false - sort by descending
+    ///
+    public let asc: Bool?
     
     /// Create method identifier filter
     /// 
@@ -60,18 +60,17 @@ public struct TransactionFilters {
     public init(
         page: Int? = nil,
         pageSize: Int? = nil,
-        asc: Bool? = nil,
         orderBy: String? = nil,
+        asc: Bool? = nil,
         createMethodId: CreateMethodId? = nil,
         createdById: String? = nil,
         batchId: String? = nil,
         noBatch: Bool? = nil
     ) throws {
-       
         self.page = page
         self.pageSize = pageSize
-        self.asc = asc
         self.orderBy = orderBy
+        self.asc = asc
         self.createMethodId = createMethodId
         self.createdById = createdById
         self.batchId = batchId

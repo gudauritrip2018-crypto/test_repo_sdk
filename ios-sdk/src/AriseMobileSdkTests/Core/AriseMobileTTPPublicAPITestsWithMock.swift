@@ -1,7 +1,7 @@
 import Foundation
 import Testing
 import UIKit
-@testable import AriseMobile
+@testable import ARISE
 
 /// Example tests using Dependency Injection with MockCloudCommerceSDK
 /// 

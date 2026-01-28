@@ -1,6 +1,6 @@
 import Foundation
 import Testing
-@testable import AriseMobile
+@testable import ARISE
 
 /// Tests for invalid input validation
 struct InvalidInputValidationTests {
@@ -12,8 +12,8 @@ struct InvalidInputValidationTests {
         let filters = try TransactionFilters(
             page: 1,
             pageSize: 20,
-            asc: true,
             orderBy: "",
+            asc: true,
             createMethodId: nil,
             createdById: nil,
             batchId: nil,
@@ -28,8 +28,8 @@ struct InvalidInputValidationTests {
         let filters = try TransactionFilters(
             page: 1,
             pageSize: 20,
-            asc: true,
             orderBy: nil,
+            asc: true,
             createMethodId: nil,
             createdById: nil,
             batchId: "",
@@ -44,8 +44,8 @@ struct InvalidInputValidationTests {
         let filters = try TransactionFilters(
             page: 1,
             pageSize: 20,
-            asc: true,
             orderBy: nil,
+            asc: true,
             createMethodId: nil,
             createdById: "",
             batchId: nil,
@@ -104,8 +104,8 @@ struct InvalidInputValidationTests {
         let filters = try TransactionFilters(
             page: 0,
             pageSize: 0,
-            asc: true,
             orderBy: nil,
+            asc: true,
             createMethodId: nil,
             createdById: nil,
             batchId: nil,
@@ -132,8 +132,8 @@ struct InvalidInputValidationTests {
         let filters = try TransactionFilters(
             page: largePage,
             pageSize: 20,
-            asc: true,
             orderBy: nil,
+            asc: true,
             createMethodId: nil,
             createdById: nil,
             batchId: nil,
@@ -149,8 +149,8 @@ struct InvalidInputValidationTests {
         let filters = try TransactionFilters(
             page: 1,
             pageSize: largePageSize,
-            asc: true,
             orderBy: nil,
+            asc: true,
             createMethodId: nil,
             createdById: nil,
             batchId: nil,
@@ -174,8 +174,8 @@ struct InvalidInputValidationTests {
         let filters = try TransactionFilters(
             page: 1,
             pageSize: 1,
-            asc: true,
             orderBy: nil,
+            asc: true,
             createMethodId: .portal,
             createdById: nil,
             batchId: nil,
@@ -184,7 +184,7 @@ struct InvalidInputValidationTests {
         
         #expect(filters.page == 1)
         #expect(filters.pageSize == 1)
-        #expect(filters.createMethodId == .portal)
+        #expect(filters.createMethodId == CreateMethodId.portal)
     }
     
     @Test("Maximum valid values are handled")
@@ -193,8 +193,8 @@ struct InvalidInputValidationTests {
         let filters = try TransactionFilters(
             page: maxInt,
             pageSize: maxInt,
-            asc: false,
             orderBy: nil,
+            asc: false,
             createMethodId: nil,
             createdById: nil,
             batchId: nil,
@@ -227,8 +227,8 @@ struct InvalidInputValidationTests {
             let filters = try TransactionFilters(
                 page: 1,
                 pageSize: 20,
-                asc: true,
                 orderBy: specialString,
+                asc: true,
                 createMethodId: nil,
                 createdById: nil,
                 batchId: nil,
@@ -256,8 +256,8 @@ struct InvalidInputValidationTests {
             let filters = try TransactionFilters(
                 page: 1,
                 pageSize: 20,
-                asc: true,
                 orderBy: unicodeString,
+                asc: true,
                 createMethodId: nil,
                 createdById: nil,
                 batchId: nil,

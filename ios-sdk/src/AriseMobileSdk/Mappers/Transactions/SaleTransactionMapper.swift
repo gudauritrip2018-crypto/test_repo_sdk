@@ -2,7 +2,7 @@ import Foundation
 
 internal struct SaleTransactionMapper {
     /// Map SDK sale request to generated OpenAPI request
-    static func toGeneratedInput(_ input: AuthorizationRequest) -> Components.Schemas.SaleRequestDto {
+    static func toGeneratedInput(_ input: CardTransactionRequest) -> Components.Schemas.SaleRequestDto {
         return Components.Schemas.SaleRequestDto(
             paymentProcessorId: input.paymentProcessorId,
             customerId: input.customerId,
@@ -13,7 +13,7 @@ internal struct SaleTransactionMapper {
             currencyId: input.currencyId,
             percentageOffRate: input.percentageOffRate,
             surchargeRate: input.surchargeRate,
-            useCardPrice: input.useCardPrice,
+            useCardPrice: true,
             billingAddress: AddressDtoMapper.toGeneratedInput(input.billingAddress),
             shippingAddress: AddressDtoMapper.toGeneratedInput(input.shippingAddress),
             contactInfo: ContactInfoDtoMapper.toGeneratedInput(input.contactInfo),
@@ -42,7 +42,7 @@ internal struct SaleTransactionMapper {
     /// Map generated response to SDK result
     static func toModel(
         _ generated: Operations.PostPayApiV1TransactionsSale.Output
-    ) throws -> AuthorizationResponse {
+    ) throws -> CardTransactionResponse {
         let okResponse = try generated.ok
         let responseBody = try okResponse.body.json
         return AuthorizationTransactionMapper.toModel(responseBody)

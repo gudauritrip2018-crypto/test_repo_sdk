@@ -2,7 +2,7 @@
  
 import Foundation
 import Testing
-@testable import AriseMobile
+@testable import ARISE
 
 struct AriseMobileSdkTests {
 
